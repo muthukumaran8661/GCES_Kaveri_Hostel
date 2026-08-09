@@ -3,6 +3,7 @@ import Header from './components/Header';
 import Auth from './components/Auth';
 import StudentDashboard from './components/StudentDashboard';
 import StaffDashboard from './components/StaffDashboard';
+import StaffProfile from './components/StaffProfile';
 import StudentProfile from './components/StudentProfile';
 
 // In dev mode, Vite proxy forwards /api to backend. In production, configure accordingly.
@@ -155,26 +156,28 @@ export default function App() {
         />
       ) : (
         <>
-          {session.role === 'student' && (
-            <div className="gkof-tabs">
-              <div
-                className={`gkof-tab ${currentTab === 'dashboard' ? 'active' : ''}`}
-                onClick={() => setCurrentTab('dashboard')}
-              >
-                Dashboard
-              </div>
-              <div
-                className={`gkof-tab ${currentTab === 'profile' ? 'active' : ''}`}
-                onClick={() => setCurrentTab('profile')}
-              >
-                Profile
-              </div>
+          <div className="gkof-tabs">
+            <div
+              className={`gkof-tab ${currentTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setCurrentTab('dashboard')}
+            >
+              Dashboard
             </div>
-          )}
+            <div
+              className={`gkof-tab ${currentTab === 'profile' ? 'active' : ''}`}
+              onClick={() => setCurrentTab('profile')}
+            >
+              Profile
+            </div>
+          </div>
 
           <div className="gkof-content-pad">
             {session.role === 'staff' ? (
-              <StaffDashboard requests={requests} onAction={handleAction} />
+              currentTab === 'profile' ? (
+                <StaffProfile session={session} onLogout={handleLogout} />
+              ) : (
+                <StaffDashboard requests={requests} onAction={handleAction} />
+              )
             ) : currentTab === 'profile' ? (
               <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} />
             ) : (
