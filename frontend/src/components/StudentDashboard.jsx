@@ -24,8 +24,16 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     setRoom(e.target.value.replace(/[^0-9]/g, ''));
   };
 
+  const handlePhoneChange = (e) => {
+    setParentPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10));
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    if (!/^[0-9]{10}$/.test(parentPhone.trim())) {
+      alert('Parent Mobile No. must be exactly 10 digits.');
+      return;
+    }
     if (saveHomeAddr && dest.trim()) {
       await onSaveProfileAddress(dest.trim());
     }
@@ -125,7 +133,16 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
             </div>
             <div className="gkof-field">
               <label>Parent Mobile No.</label>
-              <input required placeholder="10-digit mobile" pattern="[0-9]{10}" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} />
+              <input
+                required
+                placeholder="10-digit mobile"
+                pattern="[0-9]{10}"
+                maxLength={10}
+                inputMode="numeric"
+                title="Parent mobile number must be exactly 10 digits"
+                value={parentPhone}
+                onChange={handlePhoneChange}
+              />
             </div>
           </div>
 

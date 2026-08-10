@@ -27,6 +27,10 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
 
+    if (!/^[0-9]{10}$/.test(parentPhone.trim())) {
+      return res.status(400).json({ success: false, message: 'Parent mobile number must be exactly 10 digits.' });
+    }
+
     const type = requestType === 'weekday' ? 'weekday' : 'weekend';
     const status = type === 'weekday' ? 'pending_faculty' : 'pending_staff';
     const initialLog = type === 'weekday'

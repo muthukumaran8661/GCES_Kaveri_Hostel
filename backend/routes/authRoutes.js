@@ -42,6 +42,10 @@ router.post('/signup', async (req, res) => {
       if (!/^[0-9]+$/.test(room)) {
         return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
       }
+    } else if (role === 'staff') {
+      if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
+        return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
+      }
     }
 
     const user = await User.create({

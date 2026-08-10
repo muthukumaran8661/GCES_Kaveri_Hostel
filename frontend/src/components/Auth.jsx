@@ -28,6 +28,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
     setRoomNo(val.replace(/[^0-9]/g, ''));
   };
 
+  const handleStaffPhoneChange = (val) => {
+    setStaffPhone(val.replace(/[^0-9]/g, '').slice(0, 10));
+  };
+
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     setError('');
@@ -79,6 +83,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
     } else {
       if (!staffId.trim() || !designation.trim() || !staffPass.trim()) {
         setError('Please fill in every field.');
+        return;
+      }
+      if (staffPhone.trim() && !/^[0-9]{10}$/.test(staffPhone.trim())) {
+        setError('Phone number must be exactly 10 digits.');
         return;
       }
       onSignup({
@@ -280,9 +288,13 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       <label>Phone</label>
                       <input
                         type="tel"
-                        placeholder="e.g. 98765 43210"
+                        placeholder="10-digit mobile"
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        inputMode="numeric"
+                        title="Phone number must be exactly 10 digits"
                         value={staffPhone}
-                        onChange={(e) => setStaffPhone(e.target.value)}
+                        onChange={(e) => handleStaffPhoneChange(e.target.value)}
                       />
                     </div>
                   </div>
