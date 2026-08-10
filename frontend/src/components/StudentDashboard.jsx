@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import TicketCard from './TicketCard';
 
-export default function StudentDashboard({ session, requests, onSubmitRequest, onAction, onSaveProfileAddress }) {
+export default function StudentDashboard({ session, requests, onSubmitRequest, onAction, onSaveProfileAddress, onShareLocation }) {
   const mine = requests.slice().reverse();
   const total = mine.length;
   const pending = mine.filter(r => ['pending_staff', 'notifying_parent', 'pending_faculty'].includes(r.status)).length;
@@ -168,7 +168,7 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
         <h3>My Requests <span className="count">{mine.length}</span></h3>
         <div>
           {mine.length ? (
-            mine.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="student" onAction={onAction} />)
+            mine.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="student" onAction={onAction} onShareLocation={onShareLocation} />)
           ) : (
             <div className="gkof-empty">No requests yet. Submit the form above.</div>
           )}

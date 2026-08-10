@@ -74,6 +74,11 @@ const OutRequestSchema = new mongoose.Schema({
   log: [{
     type: String
   }],
+  gpsLocations: [{
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
+    timestamp: { type: Date, default: Date.now }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

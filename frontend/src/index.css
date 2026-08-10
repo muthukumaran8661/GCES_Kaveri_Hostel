@@ -795,37 +795,6 @@ body {
 }
 
 /* ---- Staff profile page ---- */
-.staff-profile-header {
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  padding-top: 0 !important;
-}
-
-.staff-profile-banner {
-  height: 80px;
-  background: linear-gradient(135deg, var(--maroon), var(--maroon-dark) 60%, #4A0A1A);
-  margin: -16px -16px 0;
-  position: relative;
-}
-
-.staff-profile-banner::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 30px;
-  background: linear-gradient(to top, var(--card), transparent);
-}
-
-.staff-profile-avatar-wrap {
-  position: relative;
-  display: inline-block;
-  margin-top: -36px;
-  z-index: 2;
-}
-
 .gkof-avatar.staff-avatar {
   width: 72px;
   height: 72px;
@@ -833,34 +802,6 @@ body {
   color: #fff;
   font-size: 30px;
   box-shadow: 0 4px 14px rgba(158, 27, 50, .25);
-  border: 3px solid var(--card);
-}
-
-.staff-online-dot {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--green);
-  border: 2.5px solid var(--card);
-  box-shadow: 0 0 0 0 rgba(46, 139, 87, .4);
-  animation: staffPulse 2s ease-in-out infinite;
-}
-
-@keyframes staffPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 139, 87, .4); }
-  50% { box-shadow: 0 0 0 6px rgba(46, 139, 87, 0); }
-}
-
-.staff-profile-dept {
-  font-family: 'Inter', sans-serif;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  margin-top: 6px;
-  letter-spacing: .3px;
 }
 
 .gkof-staff-badge {
@@ -879,48 +820,154 @@ body {
   margin-top: 8px;
 }
 
-.gkof-logout-btn {
-  padding: 12px 18px;
-  font-size: 13.5px;
-  transition: all .2s ease;
+/* ---- GPS Location Tracking Section ---- */
+.gkof-gps-section {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #FAF6EF;
+  overflow: hidden;
 }
 
-.gkof-logout-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(193, 57, 43, .35);
+.gkof-gps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(18, 122, 110, 0.05);
+  transition: background 0.15s ease;
 }
 
-.gkof-logout-confirm {
-  animation: fadeSlideIn .25s ease-out;
+.gkof-gps-header:hover {
+  background: rgba(18, 122, 110, 0.1);
 }
 
-.gkof-logout-confirm-icon {
-  margin-bottom: 8px;
+.gkof-gps-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal);
 }
 
-.gkof-logout-confirm-title {
-  margin: 0 0 4px;
+.gkof-gps-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(46, 139, 87, 0.4);
+  animation: staffPulse 2s infinite;
+}
+
+.gkof-gps-arrow {
   font-size: 14px;
-  font-weight: 700;
+  color: var(--ink-soft);
+  transition: transform 0.2s ease;
+}
+
+.gkof-gps-arrow.open {
+  transform: rotate(180deg);
+}
+
+.gkof-gps-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  animation: fadeSlideIn 0.2s ease-out;
+}
+
+.gkof-gps-share {
+  margin-bottom: 10px;
+}
+
+.gkof-gps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 12.5px;
+}
+
+.gkof-gps-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gkof-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: gkofSpin 0.7s linear infinite;
+}
+
+@keyframes gkofSpin {
+  to { transform: rotate(360deg); }
+}
+
+.gkof-gps-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.gkof-gps-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.gkof-gps-latest {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.gkof-gps-label {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.gkof-gps-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
   color: var(--ink);
 }
 
-.gkof-logout-confirm-sub {
-  margin: 0 0 14px;
+.gkof-gps-map-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: 12px;
-  font-weight: 400;
-  color: var(--ink-soft);
+  padding: 6px 12px;
+  text-decoration: none;
 }
 
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.gkof-gps-history-count {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.gkof-gps-empty {
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-style: italic;
 }
 
 /* =====================================================================

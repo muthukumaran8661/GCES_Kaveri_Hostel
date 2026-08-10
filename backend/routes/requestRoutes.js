@@ -153,4 +153,52 @@ router.patch('/:id/action', protect, async (req, res) => {
   }
 });
 
+// @route   PATCH /api/requests/:id/location
+// @desc    Update GPS location for an approved out request
+// @access  Private (Student - owner only)
+router.patch('/:id/location', protect, async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+
+    if (lat == null || lng == null) {
+      return res.status(400).json({ success: false, message: 'Latitude and longitude are required.' });
+    }
+
+    const request = await OutRequest.findOne({
+      $or: [
+        { requestId: req.params.id },
+        { _id: req.params.id }
+      ]
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Out pass request not found.' });
+    }
+
+    // Only the owner can share location
+    if (request.owner !== req.user.username) {
+      return res.status(403).json({ success: false, message: 'You can only share your own location.' });
+    }
+
+    // Only allow location sharing on active requests (not rejected or returned)
+    if (['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(request.status)) {
+      return res.status(400).json({ success: false, message: 'Location sharing is not available for completed or rejected passes.' });
+    }
+
+    request.gpsLocations.push({ lat, lng, timestamp: new Date() });
+
+    // Keep only last 50 location entries
+    if (request.gpsLocations.length > 50) {
+      request.gpsLocations = request.gpsLocations.slice(-50);
+    }
+
+    await request.save();
+
+    return res.json({ success: true, request });
+  } catch (error) {
+    console.error('Update location error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating location.' });
+  }
+});
+
 module.exports = router;

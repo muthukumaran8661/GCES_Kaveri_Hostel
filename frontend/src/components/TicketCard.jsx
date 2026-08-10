@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 
 const STATUS_META = {
@@ -14,7 +14,7 @@ const STATUS_META = {
 
 const REJECTED_STATUSES = ['faculty_rejected', 'staff_rejected', 'parent_rejected'];
 
-export default function TicketCard({ request: r, viewer, onAction }) {
+export default function TicketCard({ request: r, viewer, onAction, onShareLocation }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
   const type = r.type === 'weekday' ? 'weekday' : 'weekend';
   const typeLabel = type === 'weekday' ? 'Weekday Out Pass' : 'Weekend Out Pass';
@@ -28,12 +28,63 @@ export default function TicketCard({ request: r, viewer, onAction }) {
   const isDownloadable = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
   const displayId = r.requestId || r.id;
 
+  // GPS tracking state
+  const [gpsStatus, setGpsStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  const [gpsError, setGpsError] = useState('');
+  const [showLocationPanel, setShowLocationPanel] = useState(false);
+
+  const canShareLocation = viewer === 'student' && !REJECTED_STATUSES.includes(r.status) && r.status !== 'returned' && !!onShareLocation;
+  const hasLocations = r.gpsLocations && r.gpsLocations.length > 0;
+  const lastLocation = hasLocations ? r.gpsLocations[r.gpsLocations.length - 1] : null;
+  const canViewLocation = canShareLocation || hasLocations;
+
   function fmtDate(d) {
     if (!d) return '—';
     const dt = new Date(d);
     if (isNaN(dt)) return d;
     return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' +
       dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function fmtTime(d) {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt)) return d;
+    return dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
+      ' · ' + dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  }
+
+  function handleShareLocation() {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by your browser.');
+      setGpsStatus('error');
+      return;
+    }
+
+    setGpsStatus('loading');
+    setGpsError('');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          await onShareLocation(displayId, position.coords.latitude, position.coords.longitude);
+          setGpsStatus('success');
+          setTimeout(() => setGpsStatus('idle'), 3000);
+        } catch (err) {
+          setGpsError('Failed to share location.');
+          setGpsStatus('error');
+        }
+      },
+      (err) => {
+        let msg = 'Unable to retrieve your location.';
+        if (err.code === 1) msg = 'Location permission denied. Please allow location access.';
+        if (err.code === 2) msg = 'Location unavailable. Please try again.';
+        if (err.code === 3) msg = 'Location request timed out. Please try again.';
+        setGpsError(msg);
+        setGpsStatus('error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   }
 
   function renderTimeline() {
@@ -124,6 +175,10 @@ export default function TicketCard({ request: r, viewer, onAction }) {
     row('Pass Type', r.type === 'weekday' ? 'Weekday Out Pass' : 'Weekend Out Pass');
     row('Current Status', (STATUS_META[r.status] || {}).label || r.status);
 
+    if (lastLocation) {
+      row('Last GPS Location', `${lastLocation.lat.toFixed(6)}, ${lastLocation.lng.toFixed(6)}`);
+    }
+
     y += 6;
     doc.setDrawColor(...gold);
     doc.setLineWidth(1);
@@ -162,6 +217,98 @@ export default function TicketCard({ request: r, viewer, onAction }) {
         <span className={`gkof-status ${meta.cls}`}>{meta.label}</span>
         {isAccepted && <div className="gkof-outcome accepted">✅ Your Request was successfully Accepted</div>}
         {isDeclined && <div className="gkof-outcome declined">❌ Your Request was declined</div>}
+
+        {/* GPS Tracking Section */}
+        {(canShareLocation || canViewLocation) && (
+          <div className="gkof-gps-section">
+            <div className="gkof-gps-header" onClick={() => setShowLocationPanel(!showLocationPanel)}>
+              <span className="gkof-gps-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                Track Location
+                {hasLocations && <span className="gkof-gps-live-dot"></span>}
+              </span>
+              <span className={`gkof-gps-arrow ${showLocationPanel ? 'open' : ''}`}>▾</span>
+            </div>
+
+            {showLocationPanel && (
+              <div className="gkof-gps-body">
+                {/* Share Location Button (student only, approved only) */}
+                {canShareLocation && (
+                  <div className="gkof-gps-share">
+                    <button
+                      className={`gkof-btn teal gkof-gps-btn ${gpsStatus === 'loading' ? 'loading' : ''}`}
+                      onClick={handleShareLocation}
+                      disabled={gpsStatus === 'loading'}
+                    >
+                      {gpsStatus === 'loading' ? (
+                        <span className="gkof-gps-btn-content">
+                          <span className="gkof-spinner"></span>
+                          Getting Location…
+                        </span>
+                      ) : gpsStatus === 'success' ? (
+                        <span className="gkof-gps-btn-content">✓ Location Shared</span>
+                      ) : (
+                        <span className="gkof-gps-btn-content">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          Share My Current Location
+                        </span>
+                      )}
+                    </button>
+                    {gpsStatus === 'error' && <div className="gkof-gps-error">{gpsError}</div>}
+                  </div>
+                )}
+
+                {/* Location Display */}
+                {hasLocations && (
+                  <div className="gkof-gps-info">
+                    <div className="gkof-gps-latest">
+                      <div className="gkof-gps-coords">
+                        <span className="gkof-gps-label">Latest Coordinates</span>
+                        <span className="gkof-gps-value">{lastLocation.lat.toFixed(6)}, {lastLocation.lng.toFixed(6)}</span>
+                      </div>
+                      <div className="gkof-gps-time">
+                        <span className="gkof-gps-label">Updated</span>
+                        <span className="gkof-gps-value">{fmtTime(lastLocation.timestamp)}</span>
+                      </div>
+                    </div>
+                    <a
+                      className="gkof-btn ghost gkof-gps-map-btn"
+                      href={`https://www.google.com/maps?q=${lastLocation.lat},${lastLocation.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+                        <line x1="8" y1="2" x2="8" y2="18" />
+                        <line x1="16" y1="6" x2="16" y2="22" />
+                      </svg>
+                      View on Google Maps
+                    </a>
+                    {r.gpsLocations.length > 1 && (
+                      <div className="gkof-gps-history-count">
+                        {r.gpsLocations.length} location update{r.gpsLocations.length > 1 ? 's' : ''} recorded
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!hasLocations && viewer === 'staff' && (
+                  <div className="gkof-gps-empty">Student hasn't shared their location yet.</div>
+                )}
+                {!hasLocations && viewer === 'student' && (
+                  <div className="gkof-gps-empty">Tap the button above to share your GPS location.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {isDownloadable && (
           <div className="gkof-btn-row">
             <button className="gkof-btn gold" onClick={downloadOutPass}>⬇️ Download Out Pass (PDF)</button>

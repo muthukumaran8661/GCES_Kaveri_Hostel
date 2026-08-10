@@ -130,6 +130,15 @@ export default function App() {
     }
   };
 
+  const handleShareLocation = async (id, lat, lng) => {
+    try {
+      await apiFetch(`/api/requests/${id}/location`, 'PATCH', { lat, lng });
+      await fetchRequestsForUser(session);
+    } catch (err) {
+      alert(err.message || 'Failed to share location');
+    }
+  };
+
   if (!loaded) {
     return (
       <div className="gkof max-w-[1000px] mx-auto mt-6">
@@ -187,6 +196,7 @@ export default function App() {
                 onSubmitRequest={handleSubmitRequest}
                 onAction={handleAction}
                 onSaveProfileAddress={handleSaveProfileAddress}
+                onShareLocation={handleShareLocation}
               />
             )}
           </div>
