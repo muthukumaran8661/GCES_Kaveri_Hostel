@@ -50,7 +50,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       onLogin({ role: 'student', username: studentId.trim(), password: regNo.trim() });
     } else {
       if (!staffId.trim() || !staffPass.trim()) {
-        setError('Enter your Staff/Faculty ID and password.');
+        setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Staff ID and password.');
         return;
       }
       onLogin({ role: role, username: staffId.trim(), password: staffPass.trim() });
@@ -177,9 +177,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               ) : (
                 <>
                   <div className="gkof-field">
-                    <label>Staff ID</label>
+                    <label>{role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</label>
                     <input
-                      placeholder="e.g. STF-014"
+                      placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
                       value={staffId}
                       onChange={(e) => setStaffId(e.target.value)}
                     />

@@ -38,7 +38,7 @@ export default function StaffProfile({ session, onLogout }) {
       <div className="gkof-card">
         <h3>Personal &amp; Authorization Details</h3>
         <div className="gkof-profile-row"><span className="k">Name</span><span className="v">{session.name || session.staffId || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">ID</span><span className="v">{session.staffId || session.username || '—'}</span></div>
+        <div className="gkof-profile-row"><span className="k">{session.role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ textTransform: 'capitalize' }}>{session.role || 'staff'}</span></div>
         <div className="gkof-profile-row"><span className="k">Designation</span><span className="v">{session.designation || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || '—'}</span></div>
