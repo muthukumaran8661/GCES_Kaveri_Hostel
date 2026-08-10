@@ -1,5 +1,27 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
+import logo from './../assets/logo.png';
+
+function getLogoBase64(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      try {
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
 
 const STATUS_META = {
   pending_faculty: { label: 'Awaiting Faculty Advisor', cls: 'bg-gold-soft text-[#8A6100]' },
@@ -153,7 +175,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
     );
   }
 
-  function downloadOutPass() {
+  async function downloadOutPass() {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
     const maroon = [158, 27, 50];
@@ -161,15 +183,29 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
     const ink = [42, 33, 64];
     const inkSoft = [122, 114, 144];
 
+    // Load logo image as base64
+    const logoData = await getLogoBase64(logo);
+
     doc.setFillColor(...maroon);
     doc.rect(0, 0, pageW, 86, 'F');
+
+    let textX = 40;
+    if (logoData) {
+      // Circular white badge background for logo
+      doc.setFillColor(255, 255, 255);
+      doc.circle(60, 43, 26, 'F');
+      // Draw logo inside circle
+      doc.addImage(logoData, 'PNG', 37, 20, 46, 46);
+      textX = 98;
+    }
+
     doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
-    doc.text('GCES Kaveri Girls Hostel', 40, 36);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
-    doc.text('Government College of Engineering, Srirangam · Hostel Gate Pass', 40, 53);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-    doc.text(r.status === 'returned' ? 'RETURNED — PASS COMPLETE' : 'APPROVED OUT PASS', 40, 73);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16.5);
+    doc.text('GCES Kaveri Girls Hostel', textX, 35);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.text('Government College of Engineering, Srirangam · Hostel Gate Pass', textX, 52);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5);
+    doc.text(r.status === 'returned' ? 'RETURNED — PASS COMPLETE' : 'APPROVED OUT PASS', textX, 71);
 
     doc.setFillColor(...gold);
     doc.roundedRect(pageW - 150, 26, 110, 26, 6, 6, 'F');
