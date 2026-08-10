@@ -795,6 +795,37 @@ body {
 }
 
 /* ---- Staff profile page ---- */
+.staff-profile-header {
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  padding-top: 0 !important;
+}
+
+.staff-profile-banner {
+  height: 80px;
+  background: linear-gradient(135deg, var(--maroon), var(--maroon-dark) 60%, #4A0A1A);
+  margin: -16px -16px 0;
+  position: relative;
+}
+
+.staff-profile-banner::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to top, var(--card), transparent);
+}
+
+.staff-profile-avatar-wrap {
+  position: relative;
+  display: inline-block;
+  margin-top: -36px;
+  z-index: 2;
+}
+
 .gkof-avatar.staff-avatar {
   width: 72px;
   height: 72px;
@@ -802,6 +833,34 @@ body {
   color: #fff;
   font-size: 30px;
   box-shadow: 0 4px 14px rgba(158, 27, 50, .25);
+  border: 3px solid var(--card);
+}
+
+.staff-online-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2.5px solid var(--card);
+  box-shadow: 0 0 0 0 rgba(46, 139, 87, .4);
+  animation: staffPulse 2s ease-in-out infinite;
+}
+
+@keyframes staffPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 139, 87, .4); }
+  50% { box-shadow: 0 0 0 6px rgba(46, 139, 87, 0); }
+}
+
+.staff-profile-dept {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  letter-spacing: .3px;
 }
 
 .gkof-staff-badge {
@@ -833,6 +892,24 @@ body {
 
 .gkof-logout-confirm {
   animation: fadeSlideIn .25s ease-out;
+}
+
+.gkof-logout-confirm-icon {
+  margin-bottom: 8px;
+}
+
+.gkof-logout-confirm-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.gkof-logout-confirm-sub {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-soft);
 }
 
 @keyframes fadeSlideIn {

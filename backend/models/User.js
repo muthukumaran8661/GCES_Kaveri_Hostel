@@ -43,6 +43,18 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  department: {
+    type: String,
+    default: ''
+  },
+  email: {
+    type: String,
+    default: ''
+  },
+  phone: {
+    type: String,
+    default: ''
+  },
   homeAddress: {
     type: String,
     default: ''

@@ -15,7 +15,7 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
-    const { role, username, password, name, reg, room, studentId, staffId, designation, homeAddress } = req.body;
+    const { role, username, password, name, reg, room, studentId, staffId, designation, department, email, phone, homeAddress } = req.body;
 
     if (!role || !username || !password || !name) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
@@ -54,6 +54,9 @@ router.post('/signup', async (req, res) => {
       studentId: studentId || normalizedUsername,
       staffId: staffId || normalizedUsername,
       designation: designation || '',
+      department: department || '',
+      email: email || '',
+      phone: phone || '',
       homeAddress: homeAddress || ''
     });
 
@@ -72,6 +75,9 @@ router.post('/signup', async (req, res) => {
         studentId: user.studentId,
         staffId: user.staffId,
         designation: user.designation,
+        department: user.department,
+        email: user.email,
+        phone: user.phone,
         homeAddress: user.homeAddress
       }
     });
@@ -133,6 +139,9 @@ router.post('/login', async (req, res) => {
         studentId: user.studentId,
         staffId: user.staffId,
         designation: user.designation,
+        department: user.department,
+        email: user.email,
+        phone: user.phone,
         homeAddress: user.homeAddress
       }
     });
@@ -158,6 +167,9 @@ router.get('/me', protect, async (req, res) => {
       studentId: req.user.studentId,
       staffId: req.user.staffId,
       designation: req.user.designation,
+      department: req.user.department,
+      email: req.user.email,
+      phone: req.user.phone,
       homeAddress: req.user.homeAddress
     }
   });

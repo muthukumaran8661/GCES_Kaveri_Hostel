@@ -14,6 +14,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   // Staff form state
   const [staffId, setStaffId] = useState('');
   const [designation, setDesignation] = useState('');
+  const [department, setDepartment] = useState('');
+  const [staffEmail, setStaffEmail] = useState('');
+  const [staffPhone, setStaffPhone] = useState('');
   const [staffPass, setStaffPass] = useState('');
 
   const handleRegChange = (val) => {
@@ -84,7 +87,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         password: staffPass.trim(),
         name: staffId.trim(),
         staffId: staffId.trim(),
-        designation: designation.trim()
+        designation: designation.trim(),
+        department: department.trim(),
+        email: staffEmail.trim(),
+        phone: staffPhone.trim()
       });
     }
   };
@@ -249,6 +255,34 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                         placeholder="Hostel Warden"
                         value={designation}
                         onChange={(e) => setDesignation(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="gkof-field">
+                    <label>Department</label>
+                    <input
+                      placeholder="e.g. Hostel Administration"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                    />
+                  </div>
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Email</label>
+                      <input
+                        type="email"
+                        placeholder="e.g. staff@gces.edu"
+                        value={staffEmail}
+                        onChange={(e) => setStaffEmail(e.target.value)}
+                      />
+                    </div>
+                    <div className="gkof-field">
+                      <label>Phone</label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. 98765 43210"
+                        value={staffPhone}
+                        onChange={(e) => setStaffPhone(e.target.value)}
                       />
                     </div>
                   </div>
