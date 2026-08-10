@@ -210,15 +210,6 @@ router.patch('/:id/action', protect, async (req, res) => {
   }
 });
 
-    await request.save();
-
-    return res.json({ success: true, request });
-  } catch (error) {
-    console.error('Update request action error:', error);
-    return res.status(500).json({ success: false, message: 'Server error updating request action.' });
-  }
-});
-
 // @route   PATCH /api/requests/:id/location
 // @desc    Update GPS location for an approved out request
 // @access  Private (Student - owner only)
