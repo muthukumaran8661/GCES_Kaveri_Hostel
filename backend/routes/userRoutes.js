@@ -8,7 +8,7 @@ const { protect } = require('../middleware/authMiddleware');
 // @access  Private
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { homeAddress } = req.body;
+    const { homeAddress, department } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -17,6 +17,9 @@ router.put('/profile', protect, async (req, res) => {
 
     if (homeAddress !== undefined) {
       user.homeAddress = homeAddress.trim();
+    }
+    if (department !== undefined) {
+      user.department = department.trim();
     }
 
     await user.save();
@@ -33,6 +36,7 @@ router.put('/profile', protect, async (req, res) => {
         studentId: user.studentId,
         staffId: user.staffId,
         designation: user.designation,
+        department: user.department || '',
         homeAddress: user.homeAddress
       }
     });

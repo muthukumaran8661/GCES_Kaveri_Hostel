@@ -20,6 +20,10 @@ const OutRequestSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  department: {
+    type: String,
+    default: ''
+  },
   room: {
     type: String,
     required: true

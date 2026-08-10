@@ -230,6 +230,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
 
     row('Student Name', r.name);
     row('Register No.', r.reg);
+    row('Department', r.department || '—');
     row('Hostel / Room No.', r.room);
     row('Destination (Hometown)', r.dest);
     row('Mode of Travel', r.travel);
@@ -271,8 +272,9 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
           </div>
         )}
         <div className="gkof-name">{r.name}</div>
-        <div className="gkof-meta">{r.reg} · {r.room || '—'} · {typeLabel}</div>
+        <div className="gkof-meta">{r.reg}{r.department ? ` · ${r.department}` : ''} · {r.room || '—'} · {typeLabel}</div>
         <div className="gkof-detail-line">
+          {r.department && <><b>Department:</b> {r.department} &nbsp;·&nbsp; </>}
           <b>Destination (Hometown Address):</b> {r.dest} &nbsp;·&nbsp; <b>Travel:</b> {r.travel}<br />
           <b>Out:</b> {fmtDate(r.fromDate)} &nbsp;→&nbsp; <b>Return:</b> {fmtDate(r.toDate)}<br />
           <b>Reason:</b> {r.reason}<br />

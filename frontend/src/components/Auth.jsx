@@ -78,6 +78,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         reg: regNo.trim(),
         room: roomNo.trim(),
         studentId: studentId.trim(),
+        department: department.trim(),
         homeAddress: homeAddress.trim()
       });
     } else {
@@ -220,6 +221,14 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                         onChange={(e) => handleRoomChange(e.target.value)}
                       />
                     </div>
+                  </div>
+                  <div className="gkof-field">
+                    <label>Department</label>
+                    <input
+                      placeholder="e.g. CSE / ECE / EEE / MECH / CIVIL"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                    />
                   </div>
                   <div className="gkof-field">
                     <label>Home Address (Permanent)</label>

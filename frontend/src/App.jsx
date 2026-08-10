@@ -103,12 +103,15 @@ export default function App() {
     setAuthError('');
   };
 
-  const handleSaveProfileAddress = async (homeAddress) => {
+  const handleSaveProfileAddress = async (homeAddress, department) => {
     try {
-      const res = await apiFetch('/api/users/profile', 'PUT', { homeAddress });
+      const payload = {};
+      if (homeAddress !== undefined) payload.homeAddress = homeAddress;
+      if (department !== undefined) payload.department = department;
+      const res = await apiFetch('/api/users/profile', 'PUT', payload);
       setSession(res.user);
     } catch (err) {
-      alert(err.message || 'Failed to save address');
+      alert(err.message || 'Failed to save profile');
     }
   };
 

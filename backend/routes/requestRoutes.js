@@ -21,7 +21,7 @@ async function findRequestById(id) {
 // @access  Private (Student)
 router.post('/', protect, async (req, res) => {
   try {
-    const { room, dest, fromDate, toDate, travel, parentPhone, reason, requestType } = req.body;
+    const { room, dest, fromDate, toDate, travel, parentPhone, reason, requestType, department } = req.body;
 
     if (!room || !dest || !fromDate || !toDate || !travel || !parentPhone || !reason) {
       return res.status(400).json({ success: false, message: 'All fields are required.' });
@@ -44,6 +44,7 @@ router.post('/', protect, async (req, res) => {
       owner: req.user.username,
       name: req.user.name,
       reg: req.user.reg || '',
+      department: department || req.user.department || '',
       room,
       dest,
       fromDate,
