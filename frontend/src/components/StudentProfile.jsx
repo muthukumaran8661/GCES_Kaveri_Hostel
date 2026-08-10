@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
 
+function normalizeYear(y) {
+  if (!y) return 'I Year';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
+  return y;
+}
+
 export default function StudentProfile({ session, onSaveAddress, onLogout }) {
   const [address, setAddress] = useState(session.homeAddress || '');
   const [department, setDepartment] = useState(session.department || 'CSE');
-  const [year, setYear] = useState(session.year || '1st Year');
+  const [year, setYear] = useState(normalizeYear(session.year));
   const [savedMsg, setSavedMsg] = useState(false);
 
   const initial = (session.name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -14,12 +24,14 @@ export default function StudentProfile({ session, onSaveAddress, onLogout }) {
     setTimeout(() => { setSavedMsg(false); }, 1800);
   };
 
+  const displayYear = normalizeYear(session.year);
+
   return (
     <>
       <div className="gkof-card" style={{ textAlign: 'center' }}>
         <div className="gkof-avatar">{initial}</div>
         <div className="gkof-profile-name">{session.name}</div>
-        <div className="gkof-profile-role">Student · {session.department || 'CSE'} ({session.year || '1st Year'})</div>
+        <div className="gkof-profile-role">Student · {session.department || 'CSE'} ({displayYear})</div>
       </div>
 
       <div className="gkof-card">
@@ -27,7 +39,7 @@ export default function StudentProfile({ session, onSaveAddress, onLogout }) {
         <div className="gkof-profile-row"><span className="k">Student ID</span><span className="v">{session.studentId || session.username || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Register No.</span><span className="v">{session.reg || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Academic Year</span><span className="v">{session.year || '—'}</span></div>
+        <div className="gkof-profile-row"><span className="k">Academic Year</span><span className="v">{displayYear || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Room No.</span><span className="v">{session.room || '—'}</span></div>
       </div>
 
@@ -48,10 +60,10 @@ export default function StudentProfile({ session, onSaveAddress, onLogout }) {
           <div className="gkof-field">
             <label>Academic Year</label>
             <select value={year} onChange={(e) => setYear(e.target.value)}>
-              <option value="1st Year">1st Year</option>
-              <option value="2nd Year">2nd Year</option>
-              <option value="3rd Year">3rd Year</option>
-              <option value="4th Year">4th Year</option>
+              <option value="I Year">I Year</option>
+              <option value="II Year">II Year</option>
+              <option value="III Year">III Year</option>
+              <option value="IV Year">IV Year</option>
             </select>
           </div>
         </div>

@@ -20,9 +20,22 @@ async function apiFetch(endpoint, method = 'GET', data = null) {
   return result;
 }
 
+function normalizeYear(y) {
+  if (!y) return 'I Year';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
+  if (s.includes('ALL')) return 'All Years';
+  return y;
+}
+
 export default function StaffDashboard({ session, requests, onAction, onRefreshUsers }) {
   const isFaculty = session && session.role === 'faculty';
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
+
+  const facYearDisplay = normalizeYear(session?.year);
 
   // Filter requests based on status and user role
   const pendingFaculty = requests.filter(r => r.status === 'pending_faculty');
@@ -70,7 +83,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     setEditingUserId(u._id || u.id);
     setEditForm({
       department: u.department || 'CSE',
-      year: u.year || '1st Year',
+      year: normalizeYear(u.year) || 'I Year',
       role: u.role || 'faculty',
       status: u.status || 'active'
     });
@@ -98,10 +111,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
             <span style={{ fontSize: '20px' }}>🛡️</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--ink)' }}>
-                Authorized Scope: {session.department || 'CSE'} – {session.year || '1st Year'} Faculty Advisor
+                Authorized Scope: {session.department || 'CSE'} – {facYearDisplay} Faculty Advisor
               </div>
               <div style={{ fontSize: '12.5px', color: 'var(--ink-soft)', marginTop: '2px' }}>
-                You are assigned to approve requests for <b>{session.year || '1st Year'} {session.department || 'CSE'}</b> students only. Backend RBAC strictly restricts unauthorized approvals.
+                You are assigned to approve requests for <b>{facYearDisplay} {session.department || 'CSE'}</b> students only. Backend RBAC strictly restricts unauthorized approvals.
               </div>
             </div>
           </div>
@@ -231,14 +244,14 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                         <td style={{ padding: '10px' }}>
                           {isEditing ? (
                             <select value={editForm.year} onChange={e => setEditForm({ ...editForm, year: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
-                              <option value="1st Year">1st Year</option>
-                              <option value="2nd Year">2nd Year</option>
-                              <option value="3rd Year">3rd Year</option>
-                              <option value="4th Year">4th Year</option>
+                              <option value="I Year">I Year</option>
+                              <option value="II Year">II Year</option>
+                              <option value="III Year">III Year</option>
+                              <option value="IV Year">IV Year</option>
                               <option value="All Years">All Years</option>
                             </select>
                           ) : (
-                            u.year || '—'
+                            normalizeYear(u.year) || '—'
                           )}
                         </td>
                         <td style={{ padding: '10px' }}>

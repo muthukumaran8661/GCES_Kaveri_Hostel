@@ -5,7 +5,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [role, setRole] = useState('student'); // 'student' | 'staff'
 
   // Form states
-  const [year, setYear] = useState('1st Year');
+  const [year, setYear] = useState('I Year');
 
   // Student form state
   const [studentId, setStudentId] = useState('');
@@ -248,10 +248,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                     <div className="gkof-field">
                       <label>Academic Year</label>
                       <select value={year} onChange={(e) => setYear(e.target.value)}>
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
-                        <option value="4th Year">4th Year</option>
+                        <option value="I Year">I Year</option>
+                        <option value="II Year">II Year</option>
+                        <option value="III Year">III Year</option>
+                        <option value="IV Year">IV Year</option>
                       </select>
                     </div>
                   </div>
@@ -316,10 +316,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                     <div className="gkof-field">
                       <label>{role === 'faculty' ? 'Assigned Year' : 'Academic Year'}</label>
                       <select value={year} onChange={(e) => setYear(e.target.value)}>
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
-                        <option value="4th Year">4th Year</option>
+                        <option value="I Year">I Year</option>
+                        <option value="II Year">II Year</option>
+                        <option value="III Year">III Year</option>
+                        <option value="IV Year">IV Year</option>
                         <option value="All Years">All Years</option>
                       </select>
                     </div>

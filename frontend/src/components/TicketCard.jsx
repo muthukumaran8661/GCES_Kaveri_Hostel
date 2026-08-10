@@ -36,6 +36,16 @@ const STATUS_META = {
 
 const REJECTED_STATUSES = ['faculty_rejected', 'staff_rejected', 'parent_rejected'];
 
+function normalizeYear(y) {
+  if (!y) return 'I Year';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
+  return y;
+}
+
 export default function TicketCard({ request: r, viewer, onAction, onShareLocation }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
   const type = r.type === 'weekday' ? 'weekday' : 'weekend';
@@ -231,7 +241,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
     row('Student Name', r.name);
     row('Register No.', r.reg);
     row('Department', r.department || '—');
-    row('Academic Year', r.year || '—');
+    row('Academic Year', normalizeYear(r.year) || '—');
     row('Hostel / Room No.', r.room);
     row('Destination (Hometown)', r.dest);
     row('Mode of Travel', r.travel);
@@ -264,6 +274,8 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
     doc.save(`OutPass_${displayId}.pdf`);
   }
 
+  const reqYearDisplay = normalizeYear(r.year);
+
   return (
     <div className="gkof-ticket">
       <div className="gkof-ticket-main">
@@ -273,9 +285,9 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
           </div>
         )}
         <div className="gkof-name">{r.name}</div>
-        <div className="gkof-meta">{r.reg} · {r.department || 'CSE'}{r.year ? ` (${r.year})` : ''} · Room {r.room || '—'} · {typeLabel}</div>
+        <div className="gkof-meta">{r.reg} · {r.department || 'CSE'}{reqYearDisplay ? ` (${reqYearDisplay})` : ''} · Room {r.room || '—'} · {typeLabel}</div>
         <div className="gkof-detail-line">
-          <b>Dept &amp; Year:</b> {r.department || '—'} ({r.year || '—'}) &nbsp;·&nbsp; <b>Destination:</b> {r.dest} &nbsp;·&nbsp; <b>Travel:</b> {r.travel}<br />
+          <b>Dept &amp; Year:</b> {r.department || '—'} ({reqYearDisplay}) &nbsp;·&nbsp; <b>Destination:</b> {r.dest} &nbsp;·&nbsp; <b>Travel:</b> {r.travel}<br />
           <b>Out:</b> {fmtDate(r.fromDate)} &nbsp;→&nbsp; <b>Return:</b> {fmtDate(r.toDate)}<br />
           <b>Reason:</b> {r.reason}<br />
           <b>Parent No.:</b> {r.parentPhone}

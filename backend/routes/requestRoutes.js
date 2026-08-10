@@ -82,6 +82,17 @@ router.get('/student', protect, async (req, res) => {
   }
 });
 
+function normalizeYearKey(y) {
+  if (!y) return '';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV';
+  if (s.includes('ALL')) return 'ALL';
+  return s;
+}
+
 // @route   GET /api/requests/staff
 // @desc    Get all requests for staff/faculty dashboard queues
 // @access  Private (Staff/Faculty/Admin)
@@ -96,13 +107,13 @@ router.get('/staff', protect, async (req, res) => {
     // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
     if (req.user.role === 'faculty') {
       const facDept = (req.user.department || '').trim().toLowerCase();
-      const facYear = (req.user.year || '').trim().toLowerCase();
+      const facYear = normalizeYearKey(req.user.year);
 
       const filtered = allRequests.filter(r => {
         const reqDept = (r.department || '').trim().toLowerCase();
-        const reqYear = (r.year || '').trim().toLowerCase();
-        // Return only requests where both department AND year match
-        return reqDept === facDept && reqYear === facYear;
+        const reqYear = normalizeYearKey(r.year);
+        // Return only requests where both department AND year match (or faculty assigned to ALL)
+        return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
       });
       return res.json({ success: true, requests: filtered });
     }
@@ -144,11 +155,11 @@ router.patch('/:id/action', protect, async (req, res) => {
 
       if (req.user.role === 'faculty') {
         const facDept = (req.user.department || '').trim().toLowerCase();
-        const facYear = (req.user.year || '').trim().toLowerCase();
+        const facYear = normalizeYearKey(req.user.year);
         const reqDept = (request.department || '').trim().toLowerCase();
-        const reqYear = (request.year || '').trim().toLowerCase();
+        const reqYear = normalizeYearKey(request.year);
 
-        if (!facDept || !facYear || facDept !== reqDept || facYear !== reqYear) {
+        if (!facDept || !facYear || facDept !== reqDept || (facYear !== 'ALL' && facYear !== reqYear)) {
           return res.status(403).json({
             success: false,
             message: `403 Forbidden: You are not authorized to approve this student's request. Your assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match Student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`

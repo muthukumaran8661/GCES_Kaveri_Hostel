@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
 
+function normalizeYear(y) {
+  if (!y) return 'All Years';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
+  if (s.includes('ALL')) return 'All Years';
+  return y;
+}
+
 export default function StaffProfile({ session, onLogout }) {
   const initial = (session.name || session.staffId || '?').trim().charAt(0).toUpperCase() || '?';
   const [showConfirm, setShowConfirm] = useState(false);
+  const displayYear = normalizeYear(session.year);
 
   const handleLogoutClick = () => {
     setShowConfirm(true);
@@ -19,7 +31,7 @@ export default function StaffProfile({ session, onLogout }) {
         <div className="gkof-avatar staff-avatar">{initial}</div>
         <div className="gkof-profile-name">{session.name || session.staffId || 'Staff'}</div>
         <div className="gkof-profile-role">
-          {session.role === 'faculty' ? 'Faculty Advisor' : session.role === 'admin' ? 'Admin' : 'Hostel Warden'} · {session.department || 'All Depts'} ({session.year || 'All Years'})
+          {session.role === 'faculty' ? 'Faculty Advisor' : session.role === 'admin' ? 'Admin' : 'Hostel Warden'} · {session.department || 'All Depts'} ({displayYear})
         </div>
       </div>
 
@@ -30,7 +42,7 @@ export default function StaffProfile({ session, onLogout }) {
         <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ textTransform: 'capitalize' }}>{session.role || 'staff'}</span></div>
         <div className="gkof-profile-row"><span className="k">Designation</span><span className="v">{session.designation || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v">{session.year || '—'}</span></div>
+        <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v">{displayYear}</span></div>
         <div className="gkof-profile-row">
           <span className="k">Approval Status</span>
           <span className="v" style={{ fontWeight: 600, color: session.status === 'inactive' ? 'var(--red)' : 'var(--green)' }}>
