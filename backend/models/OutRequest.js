@@ -24,6 +24,10 @@ const OutRequestSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  year: {
+    type: String,
+    default: ''
+  },
   room: {
     type: String,
     required: true

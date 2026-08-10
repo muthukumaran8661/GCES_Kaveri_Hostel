@@ -15,7 +15,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'staff'],
+    enum: ['student', 'faculty', 'staff', 'admin'],
     required: true
   },
   name: {
@@ -46,6 +46,15 @@ const UserSchema = new mongoose.Schema({
   department: {
     type: String,
     default: ''
+  },
+  year: {
+    type: String,
+    default: ''
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
   },
   email: {
     type: String,

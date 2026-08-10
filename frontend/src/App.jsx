@@ -62,7 +62,7 @@ export default function App() {
   async function fetchRequestsForUser(user) {
     if (!user) return;
     try {
-      const endpoint = user.role === 'staff' ? '/api/requests/staff' : '/api/requests/student';
+      const endpoint = ['staff', 'faculty', 'admin'].includes(user.role) ? '/api/requests/staff' : '/api/requests/student';
       const res = await apiFetch(endpoint);
       setRequests(res.requests || []);
     } catch (e) {
@@ -103,11 +103,12 @@ export default function App() {
     setAuthError('');
   };
 
-  const handleSaveProfileAddress = async (homeAddress, department) => {
+  const handleSaveProfileAddress = async (homeAddress, department, year) => {
     try {
       const payload = {};
       if (homeAddress !== undefined) payload.homeAddress = homeAddress;
       if (department !== undefined) payload.department = department;
+      if (year !== undefined) payload.year = year;
       const res = await apiFetch('/api/users/profile', 'PUT', payload);
       setSession(res.user);
     } catch (err) {
@@ -151,6 +152,8 @@ export default function App() {
     );
   }
 
+  const isStaffOrFaculty = session && ['staff', 'faculty', 'admin'].includes(session.role);
+
   return (
     <div className="gkof max-w-[1000px] mx-auto">
       <Header
@@ -184,11 +187,11 @@ export default function App() {
           </div>
 
           <div className="gkof-content-pad">
-            {session.role === 'staff' ? (
+            {isStaffOrFaculty ? (
               currentTab === 'profile' ? (
                 <StaffProfile session={session} onLogout={handleLogout} />
               ) : (
-                <StaffDashboard requests={requests} onAction={handleAction} />
+                <StaffDashboard session={session} requests={requests} onAction={handleAction} onRefreshUsers={() => fetchRequestsForUser(session)} />
               )
             ) : currentTab === 'profile' ? (
               <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} />

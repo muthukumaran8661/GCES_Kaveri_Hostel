@@ -46,7 +46,8 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
       parentPhone: parentPhone.trim(),
       requestType,
       reason: reason.trim(),
-      department: session.department || ''
+      department: session.department || '',
+      year: session.year || ''
     });
     setFromDate('');
     setToDate('');

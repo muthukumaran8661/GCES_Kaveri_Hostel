@@ -15,7 +15,7 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
-    const { role, username, password, name, reg, room, studentId, staffId, designation, department, email, phone, homeAddress } = req.body;
+    const { role, username, password, name, reg, room, studentId, staffId, designation, department, year, email, phone, homeAddress } = req.body;
 
     if (!role || !username || !password || !name) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
@@ -30,7 +30,7 @@ router.post('/signup', async (req, res) => {
         success: false,
         message: role === 'student'
           ? 'That Student ID is already registered — log in instead.'
-          : 'That Staff ID is already registered — log in instead.'
+          : 'That Staff/Faculty ID is already registered — log in instead.'
       });
     }
 
@@ -42,7 +42,7 @@ router.post('/signup', async (req, res) => {
       if (!/^[0-9]+$/.test(room)) {
         return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
       }
-    } else if (role === 'staff') {
+    } else if (role === 'staff' || role === 'faculty') {
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
       }
@@ -51,14 +51,16 @@ router.post('/signup', async (req, res) => {
     const user = await User.create({
       username: normalizedUsername,
       password,
-      role,
+      role: role || 'student',
       name,
       reg: reg || '',
       room: room || '',
       studentId: studentId || normalizedUsername,
       staffId: staffId || normalizedUsername,
-      designation: designation || '',
+      designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Staff'),
       department: department || '',
+      year: year || '',
+      status: 'active',
       email: email || '',
       phone: phone || '',
       homeAddress: homeAddress || ''
@@ -80,6 +82,8 @@ router.post('/signup', async (req, res) => {
         staffId: user.staffId,
         designation: user.designation,
         department: user.department,
+        year: user.year,
+        status: user.status,
         email: user.email,
         phone: user.phone,
         homeAddress: user.homeAddress
@@ -144,6 +148,8 @@ router.post('/login', async (req, res) => {
         staffId: user.staffId,
         designation: user.designation,
         department: user.department,
+        year: user.year,
+        status: user.status,
         email: user.email,
         phone: user.phone,
         homeAddress: user.homeAddress
@@ -172,6 +178,8 @@ router.get('/me', protect, async (req, res) => {
       staffId: req.user.staffId,
       designation: req.user.designation,
       department: req.user.department,
+      year: req.user.year,
+      status: req.user.status,
       email: req.user.email,
       phone: req.user.phone,
       homeAddress: req.user.homeAddress

@@ -21,7 +21,7 @@ async function findRequestById(id) {
 // @access  Private (Student)
 router.post('/', protect, async (req, res) => {
   try {
-    const { room, dest, fromDate, toDate, travel, parentPhone, reason, requestType, department } = req.body;
+    const { room, dest, fromDate, toDate, travel, parentPhone, reason, requestType, department, year } = req.body;
 
     if (!room || !dest || !fromDate || !toDate || !travel || !parentPhone || !reason) {
       return res.status(400).json({ success: false, message: 'All fields are required.' });
@@ -45,6 +45,7 @@ router.post('/', protect, async (req, res) => {
       name: req.user.name,
       reg: req.user.reg || '',
       department: department || req.user.department || '',
+      year: year || req.user.year || '',
       room,
       dest,
       fromDate,
@@ -82,15 +83,31 @@ router.get('/student', protect, async (req, res) => {
 });
 
 // @route   GET /api/requests/staff
-// @desc    Get all requests for staff dashboard queues
-// @access  Private (Staff)
+// @desc    Get all requests for staff/faculty dashboard queues
+// @access  Private (Staff/Faculty/Admin)
 router.get('/staff', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'staff') {
-      return res.status(403).json({ success: false, message: 'Access denied. Staff only.' });
+    if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied. Staff or Faculty only.' });
     }
-    const requests = await OutRequest.find().sort({ createdAt: -1 });
-    return res.json({ success: true, requests });
+
+    const allRequests = await OutRequest.find().sort({ createdAt: -1 });
+
+    // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
+    if (req.user.role === 'faculty') {
+      const facDept = (req.user.department || '').trim().toLowerCase();
+      const facYear = (req.user.year || '').trim().toLowerCase();
+
+      const filtered = allRequests.filter(r => {
+        const reqDept = (r.department || '').trim().toLowerCase();
+        const reqYear = (r.year || '').trim().toLowerCase();
+        // Return only requests where both department AND year match
+        return reqDept === facDept && reqYear === facYear;
+      });
+      return res.json({ success: true, requests: filtered });
+    }
+
+    return res.json({ success: true, requests: allRequests });
   } catch (error) {
     console.error('Get staff requests error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching staff requests.' });
@@ -99,7 +116,7 @@ router.get('/staff', protect, async (req, res) => {
 
 // @route   PATCH /api/requests/:id/action
 // @desc    Update request status / log based on action
-// @access  Private (Staff/Student)
+// @access  Private (Staff/Faculty/Student)
 router.patch('/:id/action', protect, async (req, res) => {
   try {
     const { action } = req.body;
@@ -109,23 +126,54 @@ router.patch('/:id/action', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Out pass request not found.' });
     }
 
+    // STRICT BACKEND AUTHORIZATION FOR FACULTY APPROVAL / DECLINE
+    if (action === 'faculty_approved' || action === 'faculty_rejected') {
+      if (req.user.status === 'inactive') {
+        return res.status(403).json({
+          success: false,
+          message: '403 Forbidden: Your faculty account is inactive. Please contact Administrator.'
+        });
+      }
+
+      if (req.user.role !== 'faculty' && req.user.role !== 'admin' && req.user.role !== 'staff') {
+        return res.status(403).json({
+          success: false,
+          message: '403 Forbidden: Only assigned Faculty Advisors are authorized to take action on this request.'
+        });
+      }
+
+      if (req.user.role === 'faculty') {
+        const facDept = (req.user.department || '').trim().toLowerCase();
+        const facYear = (req.user.year || '').trim().toLowerCase();
+        const reqDept = (request.department || '').trim().toLowerCase();
+        const reqYear = (request.year || '').trim().toLowerCase();
+
+        if (!facDept || !facYear || facDept !== reqDept || facYear !== reqYear) {
+          return res.status(403).json({
+            success: false,
+            message: `403 Forbidden: You are not authorized to approve this student's request. Your assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match Student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
+          });
+        }
+      }
+    }
+
     switch (action) {
       case 'faculty_approved':
         request.status = 'pending_staff';
-        request.log.push('Faculty Advisor approved — forwarded to Warden');
+        request.log.push(`Faculty Advisor (${req.user.name}) approved — forwarded to Warden`);
         break;
       case 'faculty_rejected':
         request.status = 'faculty_rejected';
-        request.log.push('Faculty Advisor declined the request');
+        request.log.push(`Faculty Advisor (${req.user.name}) declined the request`);
         break;
       case 'staff_approved':
         request.status = 'notifying_parent';
         request.callAttempts = 1;
-        request.log.push('Warden approved — SMS/WhatsApp link sent, auto-call started (attempt 1)');
+        request.log.push(`Warden (${req.user.name}) approved — SMS/WhatsApp link sent, auto-call started (attempt 1)`);
         break;
       case 'staff_rejected':
         request.status = 'staff_rejected';
-        request.log.push('Warden declined the request');
+        request.log.push(`Warden (${req.user.name}) declined the request`);
         break;
       case 'parent_approved':
         request.status = 'approved_final';
@@ -152,6 +200,15 @@ router.patch('/:id/action', protect, async (req, res) => {
       default:
         return res.status(400).json({ success: false, message: 'Invalid action provided.' });
     }
+
+    await request.save();
+
+    return res.json({ success: true, request });
+  } catch (error) {
+    console.error('Update request action error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating request action.' });
+  }
+});
 
     await request.save();
 

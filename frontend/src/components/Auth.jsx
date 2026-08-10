@@ -4,6 +4,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [role, setRole] = useState('student'); // 'student' | 'staff'
 
+  // Form states
+  const [year, setYear] = useState('1st Year');
+
   // Student form state
   const [studentId, setStudentId] = useState('');
   const [regNo, setRegNo] = useState('');
@@ -11,10 +14,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [name, setName] = useState('');
   const [homeAddress, setHomeAddress] = useState('');
 
-  // Staff form state
+  // Staff/Faculty form state
   const [staffId, setStaffId] = useState('');
   const [designation, setDesignation] = useState('');
-  const [department, setDepartment] = useState('');
+  const [department, setDepartment] = useState('CSE');
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
   const [staffPass, setStaffPass] = useState('');
@@ -47,10 +50,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       onLogin({ role: 'student', username: studentId.trim(), password: regNo.trim() });
     } else {
       if (!staffId.trim() || !staffPass.trim()) {
-        setError('Enter your Staff ID and password.');
+        setError('Enter your Staff/Faculty ID and password.');
         return;
       }
-      onLogin({ role: 'staff', username: staffId.trim(), password: staffPass.trim() });
+      onLogin({ role: role, username: staffId.trim(), password: staffPass.trim() });
     }
   };
 
@@ -59,7 +62,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
     setError('');
     if (role === 'student') {
       if (!name.trim() || !regNo.trim() || !roomNo.trim() || !studentId.trim()) {
-        setError('Please fill in every field.');
+        setError('Please fill in every required field.');
         return;
       }
       if (!/^8301[0-9]{8}$/.test(regNo.trim())) {
@@ -79,10 +82,11 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         room: roomNo.trim(),
         studentId: studentId.trim(),
         department: department.trim(),
+        year: year.trim(),
         homeAddress: homeAddress.trim()
       });
     } else {
-      if (!staffId.trim() || !designation.trim() || !staffPass.trim()) {
+      if (!staffId.trim() || !staffPass.trim()) {
         setError('Please fill in every field.');
         return;
       }
@@ -91,13 +95,14 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         return;
       }
       onSignup({
-        role: 'staff',
+        role: role,
         username: staffId.trim(),
         password: staffPass.trim(),
         name: staffId.trim(),
         staffId: staffId.trim(),
-        designation: designation.trim(),
+        designation: designation.trim() || (role === 'faculty' ? 'Faculty Advisor' : 'Warden'),
         department: department.trim(),
+        year: year.trim(),
         email: staffEmail.trim(),
         phone: staffPhone.trim()
       });
@@ -133,10 +138,16 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               <span className="emoji">🎓</span>Student
             </div>
             <div
+              className={`gkof-role-opt ${role === 'faculty' ? 'active' : ''}`}
+              onClick={() => setRole('faculty')}
+            >
+              <span className="emoji">👨‍🏫</span>Faculty Advisor
+            </div>
+            <div
               className={`gkof-role-opt ${role === 'staff' ? 'active' : ''}`}
               onClick={() => setRole('staff')}
             >
-              <span className="emoji">🛡️</span>Staff / Warden
+              <span className="emoji">🛡️</span>Warden / Staff
             </div>
           </div>
 
@@ -222,13 +233,27 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       />
                     </div>
                   </div>
-                  <div className="gkof-field">
-                    <label>Department</label>
-                    <input
-                      placeholder="e.g. CSE / ECE / EEE / MECH / CIVIL"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                    />
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Department</label>
+                      <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+                        <option value="CSE">CSE</option>
+                        <option value="ECE">ECE</option>
+                        <option value="EEE">EEE</option>
+                        <option value="Mechanical">Mechanical</option>
+                        <option value="Civil">Civil</option>
+                        <option value="Mechatronics">Mechatronics</option>
+                      </select>
+                    </div>
+                    <div className="gkof-field">
+                      <label>Academic Year</label>
+                      <select value={year} onChange={(e) => setYear(e.target.value)}>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="gkof-field">
                     <label>Home Address (Permanent)</label>
@@ -259,9 +284,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 <>
                   <div className="gkof-row">
                     <div className="gkof-field">
-                      <label>Staff ID</label>
+                      <label>{role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</label>
                       <input
-                        placeholder="e.g. STF-014"
+                        placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
                         value={staffId}
                         onChange={(e) => setStaffId(e.target.value)}
                       />
@@ -269,26 +294,42 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                     <div className="gkof-field">
                       <label>Designation</label>
                       <input
-                        placeholder="Hostel Warden"
+                        placeholder={role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden'}
                         value={designation}
                         onChange={(e) => setDesignation(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="gkof-field">
-                    <label>Department</label>
-                    <input
-                      placeholder="e.g. Hostel Administration"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                    />
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Department</label>
+                      <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+                        <option value="CSE">CSE</option>
+                        <option value="ECE">ECE</option>
+                        <option value="EEE">EEE</option>
+                        <option value="Mechanical">Mechanical</option>
+                        <option value="Civil">Civil</option>
+                        <option value="Mechatronics">Mechatronics</option>
+                        <option value="Hostel Administration">Hostel Administration</option>
+                      </select>
+                    </div>
+                    <div className="gkof-field">
+                      <label>{role === 'faculty' ? 'Assigned Year' : 'Academic Year'}</label>
+                      <select value={year} onChange={(e) => setYear(e.target.value)}>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                        <option value="All Years">All Years</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="gkof-row">
                     <div className="gkof-field">
                       <label>Email</label>
                       <input
                         type="email"
-                        placeholder="e.g. staff@gces.edu"
+                        placeholder="e.g. faculty@gces.edu"
                         value={staffEmail}
                         onChange={(e) => setStaffEmail(e.target.value)}
                       />
