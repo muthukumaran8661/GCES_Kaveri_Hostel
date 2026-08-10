@@ -107,8 +107,10 @@ export default function App() {
     try {
       const payload = {};
       if (homeAddress !== undefined) payload.homeAddress = homeAddress;
-      if (department !== undefined) payload.department = department;
-      if (year !== undefined) payload.year = year;
+      if (session && session.role !== 'student') {
+        if (department !== undefined) payload.department = department;
+        if (year !== undefined) payload.year = year;
+      }
       const res = await apiFetch('/api/users/profile', 'PUT', payload);
       setSession(res.user);
     } catch (err) {

@@ -18,11 +18,15 @@ router.put('/profile', protect, async (req, res) => {
     if (homeAddress !== undefined) {
       user.homeAddress = homeAddress.trim();
     }
-    if (department !== undefined) {
-      user.department = department.trim();
-    }
-    if (year !== undefined) {
-      user.year = year.trim();
+    
+    // Protect department and year from student-side updates
+    if (user.role !== 'student') {
+      if (department !== undefined) {
+        user.department = department.trim();
+      }
+      if (year !== undefined) {
+        user.year = year.trim();
+      }
     }
 
     await user.save();
