@@ -29,11 +29,11 @@ const OutRequestSchema = new mongoose.Schema({
     required: true
   },
   fromDate: {
-    type: Date,
+    type: String,
     required: true
   },
   toDate: {
-    type: Date,
+    type: String,
     required: true
   },
   travel: {

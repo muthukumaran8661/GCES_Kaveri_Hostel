@@ -40,8 +40,37 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
 
   function fmtDate(d) {
     if (!d) return '—';
+
+    // Parse datetime-local string (e.g. "2026-08-10T13:30") directly without timezone shifts
+    if (typeof d === 'string' && d.includes('T')) {
+      const parts = d.split('T');
+      const dateParts = parts[0].split('-');
+      const timeParts = parts[1].replace('Z', '').split(':');
+
+      if (dateParts.length === 3 && timeParts.length >= 2) {
+        const year = parseInt(dateParts[0], 10);
+        const monthIdx = parseInt(dateParts[1], 10) - 1;
+        const day = parseInt(dateParts[2], 10);
+        const hour24 = parseInt(timeParts[0], 10);
+        const minute = parseInt(timeParts[1], 10);
+
+        if (!isNaN(year) && !isNaN(monthIdx) && !isNaN(day) && !isNaN(hour24) && !isNaN(minute)) {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthStr = months[monthIdx] || dateParts[1];
+          const dayStr = String(day).padStart(2, '0');
+
+          const period = hour24 >= 12 ? 'pm' : 'am';
+          const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+          const hourStr = String(hour12).padStart(2, '0');
+          const minStr = String(minute).padStart(2, '0');
+
+          return `${dayStr} ${monthStr} ${year} · ${hourStr}:${minStr} ${period}`;
+        }
+      }
+    }
+
     const dt = new Date(d);
-    if (isNaN(dt)) return d;
+    if (isNaN(dt.getTime())) return String(d);
     return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' +
       dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   }
