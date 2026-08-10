@@ -1,10 +1,19 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const OutRequest = require('../models/OutRequest');
 const { protect } = require('../middleware/authMiddleware');
 
 function uid() {
   return 'REQ' + Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+async function findRequestById(id) {
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId
+    ? { $or: [{ requestId: id }, { _id: id }] }
+    : { requestId: id };
+  return await OutRequest.findOne(query);
 }
 
 // @route   POST /api/requests
@@ -89,12 +98,7 @@ router.get('/staff', protect, async (req, res) => {
 router.patch('/:id/action', protect, async (req, res) => {
   try {
     const { action } = req.body;
-    const request = await OutRequest.findOne({
-      $or: [
-        { requestId: req.params.id },
-        { _id: req.params.id }
-      ]
-    });
+    const request = await findRequestById(req.params.id);
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Out pass request not found.' });
@@ -164,12 +168,7 @@ router.patch('/:id/location', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Latitude and longitude are required.' });
     }
 
-    const request = await OutRequest.findOne({
-      $or: [
-        { requestId: req.params.id },
-        { _id: req.params.id }
-      ]
-    });
+    const request = await findRequestById(req.params.id);
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Out pass request not found.' });
