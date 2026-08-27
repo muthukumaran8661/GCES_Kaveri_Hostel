@@ -1,0 +1,761 @@
+import React, { useState, useMemo } from 'react';
+import { jsPDF } from 'jspdf';
+import logo from './../assets/logo.png';
+
+function getLogoBase64(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      try {
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+function normalizeYear(y) {
+  if (!y) return 'All Years';
+  const s = String(y).trim().toUpperCase();
+  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
+  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
+  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
+  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
+  if (s.includes('ALL')) return 'All Years';
+  return y;
+}
+
+function formatStatus(status) {
+  switch (status) {
+    case 'pending_faculty': return 'Pending Faculty';
+    case 'pending_staff': return 'Pending Warden';
+    case 'notifying_parent': return 'Calling Parent';
+    case 'approved_final': return 'Approved';
+    case 'returned': return 'Returned';
+    case 'faculty_rejected': return 'Faculty Rejected';
+    case 'staff_rejected': return 'Warden Declined';
+    case 'parent_rejected': return 'Parent Declined';
+    default: return status || '—';
+  }
+}
+
+function getStatusCategory(status) {
+  if (['approved_final', 'returned'].includes(status)) return 'approved';
+  if (['pending_faculty', 'pending_staff', 'notifying_parent'].includes(status)) return 'pending';
+  if (['faculty_rejected', 'staff_rejected', 'parent_rejected'].includes(status)) return 'rejected';
+  return 'other';
+}
+
+function getStatusBadgeStyle(status) {
+  const cat = getStatusCategory(status);
+  if (cat === 'approved') return { bg: '#E6F4EA', color: '#137333', border: '#CEEAD6' };
+  if (cat === 'pending') return { bg: '#FEF7E0', color: '#B06000', border: '#FCE8B2' };
+  if (cat === 'rejected') return { bg: '#FCE8E6', color: '#C5221F', border: '#FAD2CF' };
+  return { bg: '#F1F3F4', color: '#3C4043', border: '#DADCE0' };
+}
+
+export default function StudentRequestReport({ session, requests = [], onClose, onRefresh }) {
+  const isFaculty = session && session.role === 'faculty';
+  const facDept = session?.department || 'CSE';
+  const facYear = session?.year ? normalizeYear(session.year) : 'All Years';
+
+  // Filters state
+  const [filterDept, setFilterDept] = useState(isFaculty ? facDept : 'ALL');
+  const [filterYear, setFilterYear] = useState(isFaculty ? (facYear === 'All Years' ? 'ALL' : facYear) : 'ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterDate, setFilterDate] = useState('');
+  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'detailed'
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Scoped & Filtered Requests
+  const filteredRequests = useMemo(() => {
+    return requests.filter(r => {
+      // Dept filter
+      if (isFaculty) {
+        if ((r.department || '').trim().toLowerCase() !== facDept.trim().toLowerCase()) return false;
+      } else if (filterDept !== 'ALL') {
+        if ((r.department || '').trim().toLowerCase() !== filterDept.trim().toLowerCase()) return false;
+      }
+
+      // Year filter
+      if (isFaculty && facYear !== 'All Years') {
+        if (normalizeYear(r.year) !== facYear) return false;
+      } else if (filterYear !== 'ALL') {
+        if (normalizeYear(r.year) !== filterYear) return false;
+      }
+
+      // Status filter
+      if (filterStatus === 'APPROVED') {
+        if (!['approved_final', 'returned'].includes(r.status)) return false;
+      } else if (filterStatus === 'PENDING') {
+        if (!['pending_faculty', 'pending_staff', 'notifying_parent'].includes(r.status)) return false;
+      } else if (filterStatus === 'REJECTED') {
+        if (!['faculty_rejected', 'staff_rejected', 'parent_rejected'].includes(r.status)) return false;
+      } else if (filterStatus === 'RETURNED') {
+        if (r.status !== 'returned') return false;
+      }
+
+      // Date filter
+      if (filterDate) {
+        const fromD = r.fromDate || '';
+        const createdD = r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : '';
+        if (!fromD.includes(filterDate) && !createdD.includes(filterDate)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [requests, isFaculty, facDept, facYear, filterDept, filterYear, filterStatus, filterDate]);
+
+  // Overall Statistics
+  const stats = useMemo(() => {
+    const total = filteredRequests.length;
+    const approved = filteredRequests.filter(r => ['approved_final', 'returned'].includes(r.status)).length;
+    const pending = filteredRequests.filter(r => ['pending_faculty', 'pending_staff', 'notifying_parent'].includes(r.status)).length;
+    const rejected = filteredRequests.filter(r => ['faculty_rejected', 'staff_rejected', 'parent_rejected'].includes(r.status)).length;
+    return { total, approved, pending, rejected };
+  }, [filteredRequests]);
+
+  // Student-Wise Aggregated Statistics
+  const studentWiseStats = useMemo(() => {
+    const map = new Map();
+    filteredRequests.forEach((r) => {
+      const regKey = (r.reg || r.studentId || r.name || 'UNKNOWN').trim().toUpperCase();
+      if (!map.has(regKey)) {
+        map.set(regKey, {
+          name: r.name || 'N/A',
+          reg: r.reg || r.studentId || '—',
+          department: r.department || '—',
+          year: normalizeYear(r.year),
+          total: 0,
+          approved: 0,
+          pending: 0,
+          rejected: 0
+        });
+      }
+      const item = map.get(regKey);
+      item.total += 1;
+      const cat = getStatusCategory(r.status);
+      if (cat === 'approved') item.approved += 1;
+      else if (cat === 'pending') item.pending += 1;
+      else if (cat === 'rejected') item.rejected += 1;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [filteredRequests]);
+
+  const totalStudents = studentWiseStats.length;
+
+  // PDF Generation Function
+  async function generatePDF() {
+    try {
+      setIsGeneratingPDF(true);
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const maroon = [158, 27, 50];
+      const gold = [217, 164, 65];
+      const ink = [42, 33, 64];
+      const inkSoft = [100, 100, 115];
+
+      const logoData = await getLogoBase64(logo);
+
+      function drawHeader(pageNum) {
+        // Maroon Header Bar
+        doc.setFillColor(...maroon);
+        doc.rect(0, 0, pageW, 72, 'F');
+
+        let textX = 35;
+        if (logoData) {
+          doc.setFillColor(255, 255, 255);
+          doc.circle(50, 36, 22, 'F');
+          doc.addImage(logoData, 'PNG', 32, 18, 36, 36);
+          textX = 82;
+        }
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Government College of Engineering, Srirangam', textX, 30);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.setTextColor(243, 220, 166);
+        doc.text('GCES Kaveri Girls Hostel — Student Out Pass Request Report', textX, 47);
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`Official Document | Page ${pageNum}`, pageW - 35, 30, { align: 'right' });
+      }
+
+      let currentPage = 1;
+      drawHeader(currentPage);
+
+      let y = 90;
+
+      // Report Title & Timestamp
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(...ink);
+      doc.text('Student Out Pass Request Report', 35, y);
+
+      const nowStr = new Date().toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...inkSoft);
+      doc.text(`Generated: ${nowStr}`, pageW - 35, y, { align: 'right' });
+
+      y += 16;
+      const deptLabel = isFaculty ? facDept : (filterDept === 'ALL' ? 'All Depts' : filterDept);
+      const yearLabel = isFaculty ? facYear : (filterYear === 'ALL' ? 'All Years' : filterYear);
+      const statusLabel = filterStatus === 'ALL' ? 'All Statuses' : filterStatus;
+      const dateLabel = filterDate ? filterDate : 'All Dates';
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(...inkSoft);
+      doc.text(`Filters: Dept: ${deptLabel} | Year: ${yearLabel} | Status: ${statusLabel} | Date: ${dateLabel}`, 35, y);
+
+      y += 18;
+
+      // Overall Summary Statistics Box (5 Columns)
+      doc.setFillColor(250, 248, 242);
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(0.8);
+      doc.roundedRect(35, y, pageW - 70, 36, 4, 4, 'FD');
+
+      const colW = (pageW - 70) / 5;
+      const boxY = y + 22;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(42, 33, 64);
+      doc.text(`Total Students: ${totalStudents}`, 35 + colW * 0.5, boxY, { align: 'center' });
+      doc.text(`Total Requests: ${stats.total}`, 35 + colW * 1.5, boxY, { align: 'center' });
+      doc.setTextColor(19, 115, 51);
+      doc.text(`Approved: ${stats.approved}`, 35 + colW * 2.5, boxY, { align: 'center' });
+      doc.setTextColor(176, 96, 0);
+      doc.text(`Pending: ${stats.pending}`, 35 + colW * 3.5, boxY, { align: 'center' });
+      doc.setTextColor(197, 34, 31);
+      doc.text(`Rejected: ${stats.rejected}`, 35 + colW * 4.5, boxY, { align: 'center' });
+
+      y += 50;
+
+      // SECTION 1: Student-Wise Statistics Table
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(...ink);
+      doc.text('1. Student-Wise Request Statistics', 35, y);
+      y += 14;
+
+      const statHeaders = [
+        { name: '#', width: 25 },
+        { name: 'Student Name', width: 145 },
+        { name: 'Register No.', width: 100 },
+        { name: 'Dept & Year', width: 95 },
+        { name: 'Total', width: 40 },
+        { name: 'Approved', width: 40 },
+        { name: 'Pending', width: 40 },
+        { name: 'Rejected', width: 40 }
+      ];
+
+      function drawStatTableHeader(curY) {
+        doc.setFillColor(42, 33, 64);
+        doc.rect(35, curY, pageW - 70, 20, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        let x = 40;
+        statHeaders.forEach(h => {
+          doc.text(h.name, x, curY + 13);
+          x += h.width;
+        });
+        return curY + 20;
+      }
+
+      y = drawStatTableHeader(y);
+
+      if (studentWiseStats.length === 0) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...inkSoft);
+        doc.text('No student records found.', 35 + (pageW - 70) / 2, y + 20, { align: 'center' });
+        y += 35;
+      } else {
+        studentWiseStats.forEach((st, idx) => {
+          const rowH = 20;
+          if (y + rowH > pageH - 45) {
+            currentPage++;
+            doc.addPage();
+            drawHeader(currentPage);
+            y = 85;
+            y = drawStatTableHeader(y);
+          }
+
+          if (idx % 2 === 1) {
+            doc.setFillColor(248, 246, 240);
+            doc.rect(35, y, pageW - 70, rowH, 'F');
+          }
+
+          doc.setDrawColor(230, 226, 215);
+          doc.setLineWidth(0.5);
+          doc.line(35, y + rowH, pageW - 35, y + rowH);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(...ink);
+
+          let curX = 40;
+          doc.text(String(idx + 1), curX, y + 13); curX += statHeaders[0].width;
+          doc.setFont('helvetica', 'bold');
+          doc.text(st.name, curX, y + 13); curX += statHeaders[1].width;
+          doc.setFont('helvetica', 'normal');
+          doc.text(st.reg, curX, y + 13); curX += statHeaders[2].width;
+          doc.text(`${st.department} (${st.year})`, curX, y + 13); curX += statHeaders[3].width;
+          doc.setFont('helvetica', 'bold');
+          doc.text(String(st.total), curX, y + 13); curX += statHeaders[4].width;
+          doc.setTextColor(19, 115, 51);
+          doc.text(String(st.approved), curX, y + 13); curX += statHeaders[5].width;
+          doc.setTextColor(176, 96, 0);
+          doc.text(String(st.pending), curX, y + 13); curX += statHeaders[6].width;
+          doc.setTextColor(197, 34, 31);
+          doc.text(String(st.rejected), curX, y + 13);
+
+          y += rowH;
+        });
+      }
+
+      y += 25;
+
+      // SECTION 2: Detailed Out Pass Requests Log Table
+      if (y + 120 > pageH - 45) {
+        currentPage++;
+        doc.addPage();
+        drawHeader(currentPage);
+        y = 85;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(...ink);
+      doc.text('2. Detailed Student Out Pass Request Records', 35, y);
+      y += 14;
+
+      const logHeaders = [
+        { name: '#', width: 22 },
+        { name: 'Student Name & Reg No.', width: 110 },
+        { name: 'Dept / Year', width: 68 },
+        { name: 'Out Time', width: 85 },
+        { name: 'Return Time', width: 85 },
+        { name: 'Destination / Purpose', width: 95 },
+        { name: 'Status', width: 60 }
+      ];
+
+      function drawLogTableHeader(curY) {
+        doc.setFillColor(42, 33, 64);
+        doc.rect(35, curY, pageW - 70, 20, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        let x = 40;
+        logHeaders.forEach(h => {
+          doc.text(h.name, x, curY + 13);
+          x += h.width;
+        });
+        return curY + 20;
+      }
+
+      y = drawLogTableHeader(y);
+
+      if (filteredRequests.length === 0) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(...inkSoft);
+        doc.text('No student request records match the selected criteria.', 35 + (pageW - 70) / 2, y + 25, { align: 'center' });
+      } else {
+        filteredRequests.forEach((r, idx) => {
+          const nameReg = `${r.name || 'N/A'}\nReg: ${r.reg || '—'}`;
+          const deptYr = `${r.department || '—'}\n${normalizeYear(r.year)}`;
+          const outTime = r.fromDate || '—';
+          const retTime = r.toDate || '—';
+          const destReason = `${r.dest || '—'}${r.reason ? ` (${r.reason})` : ''}`;
+          const statusText = formatStatus(r.status);
+
+          const linesName = doc.splitTextToSize(nameReg, logHeaders[1].width - 6);
+          const linesDest = doc.splitTextToSize(destReason, logHeaders[5].width - 6);
+          const linesOut = doc.splitTextToSize(outTime, logHeaders[3].width - 6);
+          const linesRet = doc.splitTextToSize(retTime, logHeaders[4].width - 6);
+
+          const maxLines = Math.max(linesName.length, linesDest.length, linesOut.length, linesRet.length, 1);
+          const rowH = Math.max(22, maxLines * 11 + 8);
+
+          if (y + rowH > pageH - 45) {
+            currentPage++;
+            doc.addPage();
+            drawHeader(currentPage);
+            y = 85;
+            y = drawLogTableHeader(y);
+          }
+
+          if (idx % 2 === 1) {
+            doc.setFillColor(248, 246, 240);
+            doc.rect(35, y, pageW - 70, rowH, 'F');
+          }
+
+          doc.setDrawColor(230, 226, 215);
+          doc.setLineWidth(0.5);
+          doc.line(35, y + rowH, pageW - 35, y + rowH);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(...ink);
+
+          let curX = 40;
+          doc.text(String(idx + 1), curX, y + 13); curX += logHeaders[0].width;
+          doc.text(linesName, curX, y + 11); curX += logHeaders[1].width;
+          const linesDept = doc.splitTextToSize(deptYr, logHeaders[2].width - 6);
+          doc.text(linesDept, curX, y + 11); curX += logHeaders[2].width;
+          doc.text(linesOut, curX, y + 11); curX += logHeaders[3].width;
+          doc.text(linesRet, curX, y + 11); curX += logHeaders[4].width;
+          doc.text(linesDest, curX, y + 11); curX += logHeaders[5].width;
+
+          const badgeCat = getStatusCategory(r.status);
+          if (badgeCat === 'approved') doc.setTextColor(19, 115, 51);
+          else if (badgeCat === 'pending') doc.setTextColor(176, 96, 0);
+          else if (badgeCat === 'rejected') doc.setTextColor(197, 34, 31);
+          else doc.setTextColor(60, 64, 67);
+
+          doc.setFont('helvetica', 'bold');
+          const linesStatus = doc.splitTextToSize(statusText, logHeaders[6].width - 4);
+          doc.text(linesStatus, curX, y + 11);
+
+          y += rowH;
+        });
+      }
+
+      // Footers
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setDrawColor(217, 164, 65);
+        doc.setLineWidth(0.8);
+        doc.line(35, pageH - 32, pageW - 35, pageH - 32);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 130);
+        doc.text('Government College of Engineering, Srirangam — Kaveri Girls Hostel Management System', 35, pageH - 18);
+        doc.text(`Page ${p} of ${totalPages}`, pageW - 35, pageH - 18, { align: 'right' });
+      }
+
+      const fileName = `Student_OutPass_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-[var(--gold-soft)] overflow-hidden my-6 flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="bg-[#9E1B32] text-white p-4 px-6 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📊</span>
+            <div>
+              <h2 className="font-serif text-lg font-bold leading-tight">Student Request Report & Analytics</h2>
+              <p className="text-xs text-gold-soft opacity-90">
+                {isFaculty
+                  ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`
+                  : 'Hostel Out Pass Portal — Warden & Admin Report Center'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Refresh Live Data"
+              >
+                🔄 Refresh Data
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg text-lg leading-none transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Filters Bar */}
+        <div className="p-4 px-6 bg-[var(--cream-soft)] border-b border-[var(--line)] flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-3 text-xs w-full lg:w-auto">
+            {isFaculty ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg font-medium">
+                <span>🔒 Scope Locked:</span>
+                <b>{facDept} ({facYear})</b>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <label className="font-semibold text-gray-700">Department:</label>
+                  <select
+                    value={filterDept}
+                    onChange={e => setFilterDept(e.target.value)}
+                    className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                  >
+                    <option value="ALL">All Departments</option>
+                    <option value="CSE">CSE</option>
+                    <option value="ECE">ECE</option>
+                    <option value="EEE">EEE</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="Civil">Civil</option>
+                    <option value="Mechatronics">Mechatronics</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <label className="font-semibold text-gray-700">Year:</label>
+                  <select
+                    value={filterYear}
+                    onChange={e => setFilterYear(e.target.value)}
+                    className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                  >
+                    <option value="ALL">All Years</option>
+                    <option value="I Year">I Year</option>
+                    <option value="II Year">II Year</option>
+                    <option value="III Year">III Year</option>
+                    <option value="IV Year">IV Year</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center gap-1.5">
+              <label className="font-semibold text-gray-700">Status:</label>
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="APPROVED">Approved / Out</option>
+                <option value="PENDING">Pending Approval</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="RETURNED">Returned</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <label className="font-semibold text-gray-700">Date:</label>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={e => setFilterDate(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              />
+              {filterDate && (
+                <button
+                  onClick={() => setFilterDate('')}
+                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                  title="Clear Date"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Download PDF Button */}
+          <button
+            onClick={generatePDF}
+            disabled={isGeneratingPDF}
+            className="w-full lg:w-auto px-4 py-2 bg-[#9E1B32] hover:bg-[#801427] text-white text-xs font-bold rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <span>📥</span>
+            <span>{isGeneratingPDF ? 'Generating Official PDF...' : 'Download PDF Report'}</span>
+          </button>
+        </div>
+
+        {/* 5 Summary Statistics Cards */}
+        <div className="p-4 px-6 grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white flex-shrink-0">
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-center">
+            <div className="text-xl font-bold text-indigo-800">{totalStudents}</div>
+            <div className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider mt-0.5">Total Students</div>
+          </div>
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-center">
+            <div className="text-xl font-bold text-gray-800">{stats.total}</div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Total Requests</div>
+          </div>
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+            <div className="text-xl font-bold text-emerald-700">{stats.approved}</div>
+            <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mt-0.5">Approved</div>
+          </div>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+            <div className="text-xl font-bold text-amber-700">{stats.pending}</div>
+            <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mt-0.5">Pending</div>
+          </div>
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-center">
+            <div className="text-xl font-bold text-rose-700">{stats.rejected}</div>
+            <div className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider mt-0.5">Rejected</div>
+          </div>
+        </div>
+
+        {/* View Switcher Tabs */}
+        <div className="px-6 border-b border-gray-200 bg-gray-50/50 flex gap-4 text-xs font-semibold flex-shrink-0">
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'summary'
+                ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span>👥</span> Student Statistics ({studentWiseStats.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('detailed')}
+            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'detailed'
+                ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span>📋</span> Detailed Out Pass Log ({filteredRequests.length})
+          </button>
+        </div>
+
+        {/* Tab 1: Student-Wise Statistics Table */}
+        <div className="p-4 px-6 overflow-y-auto flex-1">
+          {activeTab === 'summary' ? (
+            studentWiseStats.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <span className="text-3xl block mb-2">🎓</span>
+                <p className="font-semibold text-sm">No student statistics match your selected filters.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
+                      <th className="p-3">#</th>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3">Register No.</th>
+                      <th className="p-3">Dept &amp; Year</th>
+                      <th className="p-3 text-center">Total Requests</th>
+                      <th className="p-3 text-center">Approved</th>
+                      <th className="p-3 text-center">Pending</th>
+                      <th className="p-3 text-center">Rejected</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {studentWiseStats.map((st, i) => (
+                      <tr key={st.reg + i} className="hover:bg-amber-50/40 transition-colors">
+                        <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
+                        <td className="p-3 font-bold text-gray-900">{st.name}</td>
+                        <td className="p-3 font-mono text-gray-600">{st.reg}</td>
+                        <td className="p-3 text-gray-700">
+                          {st.department} <span className="text-[10px] text-gray-400">({st.year})</span>
+                        </td>
+                        <td className="p-3 text-center font-bold text-gray-800 bg-gray-50">{st.total}</td>
+                        <td className="p-3 text-center font-bold text-emerald-700 bg-emerald-50/50">{st.approved}</td>
+                        <td className="p-3 text-center font-bold text-amber-700 bg-amber-50/50">{st.pending}</td>
+                        <td className="p-3 text-center font-bold text-rose-700 bg-rose-50/50">{st.rejected}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            /* Tab 2: Detailed Out Pass Requests Log Table */
+            filteredRequests.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <span className="text-3xl block mb-2">📋</span>
+                <p className="font-semibold text-sm">No student request records match your filters.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
+                      <th className="p-3">#</th>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3">Register No.</th>
+                      <th className="p-3">Dept &amp; Year</th>
+                      <th className="p-3">Out Time</th>
+                      <th className="p-3">Return Time</th>
+                      <th className="p-3">Reason / Purpose</th>
+                      <th className="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredRequests.map((r, i) => {
+                      const bStyle = getStatusBadgeStyle(r.status);
+                      return (
+                        <tr key={r.requestId || r.id || r._id || i} className="hover:bg-amber-50/40 transition-colors">
+                          <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
+                          <td className="p-3 font-semibold text-gray-900">{r.name || '—'}</td>
+                          <td className="p-3 font-mono text-gray-600">{r.reg || '—'}</td>
+                          <td className="p-3 text-gray-700">
+                            <div>{r.department || '—'}</div>
+                            <div className="text-[10px] text-gray-400">{normalizeYear(r.year)}</div>
+                          </td>
+                          <td className="p-3 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
+                          <td className="p-3 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
+                          <td className="p-3 text-gray-700 max-w-[200px] truncate" title={r.reason || r.dest}>
+                            <b>{r.dest || '—'}</b>
+                            {r.reason && <span className="text-gray-500 text-[11px] block">{r.reason}</span>}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className="inline-block px-2.5 py-1 text-[10.5px] font-semibold rounded-full border"
+                              style={{ backgroundColor: bStyle.bg, color: bStyle.color, borderColor: bStyle.border }}
+                            >
+                              {formatStatus(r.status)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-3 px-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 flex-shrink-0">
+          <div>
+            Showing <b>{studentWiseStats.length}</b> unique students | <b>{filteredRequests.length}</b> out pass requests
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer"
+          >
+            Close Report
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

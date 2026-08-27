@@ -1,5 +1,55 @@
 import React, { useState } from 'react';
 
+function PasswordInput({ value, onChange, placeholder, readOnly, maxLength, inputMode, style, id, name }) {
+  const [show, setShow] = useState(false);
+
+  const toggleShow = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShow((prev) => !prev);
+  };
+
+  return (
+    <div className="gkof-pass-wrap">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        id={id}
+        name={name}
+        style={style}
+      />
+      <button
+        type="button"
+        onClick={toggleShow}
+        onMouseDown={(e) => e.preventDefault()}
+        tabIndex={-1}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        title={show ? 'Hide password' : 'Show password'}
+        className="gkof-pass-toggle-btn"
+      >
+        {show ? (
+          /* Eye-Off Icon (Password is currently visible; click to hide) */
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+          </svg>
+        ) : (
+          /* Eye Icon (Password is currently hidden; click to show) */
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function Auth({ onLogin, onSignup, error, setError }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [role, setRole] = useState('student'); // 'student' | 'staff'
@@ -21,6 +71,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
   const [staffPass, setStaffPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
 
   const handleRegChange = (val) => {
     const v = val.replace(/[^0-9]/g, '').slice(0, 12);
@@ -50,7 +101,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       onLogin({ role: 'student', username: studentId.trim(), password: regNo.trim() });
     } else {
       if (!staffId.trim() || !staffPass.trim()) {
-        setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Staff ID and password.');
+        setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Warden / Admin ID and password.');
         return;
       }
       onLogin({ role: role, username: staffId.trim(), password: staffPass.trim() });
@@ -86,8 +137,12 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         homeAddress: homeAddress.trim()
       });
     } else {
-      if (!staffId.trim() || !staffPass.trim()) {
+      if (!staffId.trim() || !staffPass.trim() || !confirmPass.trim()) {
         setError('Please fill in every field.');
+        return;
+      }
+      if (staffPass !== confirmPass) {
+        setError('Choose Password and Confirm Password do not match.');
         return;
       }
       if (staffPhone.trim() && !/^[0-9]{10}$/.test(staffPhone.trim())) {
@@ -147,7 +202,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               className={`gkof-role-opt ${role === 'staff' ? 'active' : ''}`}
               onClick={() => setRole('staff')}
             >
-              <span className="emoji">🛡️</span>Warden / Staff
+              <span className="emoji">🛡️</span>Warden / Admin
             </div>
           </div>
 
@@ -165,7 +220,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   </div>
                   <div className="gkof-field">
                     <label>Password (your Register No.)</label>
-                    <input
+                    <PasswordInput
                       placeholder="8301XXXXXXXX"
                       maxLength={12}
                       inputMode="numeric"
@@ -177,7 +232,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               ) : (
                 <>
                   <div className="gkof-field">
-                    <label>{role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</label>
+                    <label>{role === 'faculty' ? 'Faculty ID' : 'Warden / Admin ID'}</label>
                     <input
                       placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
                       value={staffId}
@@ -186,8 +241,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   </div>
                   <div className="gkof-field">
                     <label>Password</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       placeholder="••••••••"
                       value={staffPass}
                       onChange={(e) => setStaffPass(e.target.value)}
@@ -273,7 +327,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   </div>
                   <div className="gkof-field">
                     <label>Password</label>
-                    <input
+                    <PasswordInput
                       readOnly
                       placeholder="Auto-set to your Register No."
                       value={regNo}
@@ -284,7 +338,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 <>
                   <div className="gkof-row">
                     <div className="gkof-field">
-                      <label>{role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</label>
+                      <label>{role === 'faculty' ? 'Faculty ID' : 'Warden / Admin ID'}</label>
                       <input
                         placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
                         value={staffId}
@@ -350,8 +404,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   </div>
                   <div className="gkof-field">
                     <label>Choose Password</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       placeholder="••••••••"
                       value={staffPass}
                       onChange={(e) => setStaffPass(e.target.value)}

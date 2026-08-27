@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
+import StudentRequestReport from './StudentRequestReport';
 
 async function apiFetch(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -36,6 +37,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
   const facYearDisplay = normalizeYear(session?.year);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Filter requests based on status and user role
   const pendingFaculty = requests.filter(r => r.status === 'pending_faculty');
@@ -120,6 +122,32 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           </div>
         </div>
       )}
+
+      {/* Student Request Report Quick Access Card */}
+      <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255, 255, 255, 0.15)', width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+              📊
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: '#FFF' }}>
+                Student Request Report &amp; Analytics
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gold-soft)', marginTop: '2px' }}>
+                {isFaculty ? `View and download PDF out pass reports for ${session.department || 'CSE'} (${facYearDisplay})` : 'View, filter, and download official PDF reports for student out requests'}
+              </div>
+            </div>
+          </div>
+          <button
+            className="gkof-btn"
+            style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 18px', fontSize: '13px', cursor: 'pointer' }}
+            onClick={() => setShowReportModal(true)}
+          >
+            📊 Request Report
+          </button>
+        </div>
+      </div>
 
       {/* Stats row */}
       <div className="gkof-stats">
@@ -219,7 +247,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                           {isEditing ? (
                             <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
                               <option value="faculty">Faculty Advisor</option>
-                              <option value="staff">Warden / Staff</option>
+                              <option value="staff">Warden / Admin</option>
                               <option value="admin">Admin</option>
                             </select>
                           ) : (
@@ -284,6 +312,15 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
             </div>
           )}
         </div>
+      )}
+
+      {showReportModal && (
+        <StudentRequestReport
+          session={session}
+          requests={requests}
+          onClose={() => setShowReportModal(false)}
+          onRefresh={onRefreshUsers}
+        />
       )}
     </>
   );

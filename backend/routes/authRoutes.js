@@ -30,7 +30,7 @@ router.post('/signup', async (req, res) => {
         success: false,
         message: role === 'student'
           ? 'That Student ID is already registered — log in instead.'
-          : 'That Staff/Faculty ID is already registered — log in instead.'
+          : 'That Warden/Admin/Faculty ID is already registered — log in instead.'
       });
     }
 
@@ -57,7 +57,7 @@ router.post('/signup', async (req, res) => {
       room: room || '',
       studentId: studentId || normalizedUsername,
       staffId: staffId || normalizedUsername,
-      designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Staff'),
+      designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden / Admin'),
       department: department || '',
       year: year || '',
       status: 'active',

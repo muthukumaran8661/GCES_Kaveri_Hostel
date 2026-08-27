@@ -29,17 +29,17 @@ export default function StaffProfile({ session, onLogout }) {
     <>
       <div className="gkof-card" style={{ textAlign: 'center' }}>
         <div className="gkof-avatar staff-avatar">{initial}</div>
-        <div className="gkof-profile-name">{session.name || session.staffId || 'Staff'}</div>
+        <div className="gkof-profile-name">{session.name || session.staffId || 'Warden / Admin'}</div>
         <div className="gkof-profile-role">
-          {session.role === 'faculty' ? 'Faculty Advisor' : session.role === 'admin' ? 'Admin' : 'Hostel Warden'} · {session.department || 'All Depts'} ({displayYear})
+          {session.role === 'faculty' ? 'Faculty Advisor' : session.role === 'admin' ? 'Admin' : 'Hostel Warden / Admin'} · {session.department || 'All Depts'} ({displayYear})
         </div>
       </div>
 
       <div className="gkof-card">
         <h3>Personal &amp; Authorization Details</h3>
         <div className="gkof-profile-row"><span className="k">Name</span><span className="v">{session.name || session.staffId || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">{session.role === 'faculty' ? 'Faculty ID' : 'Staff ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ textTransform: 'capitalize' }}>{session.role || 'staff'}</span></div>
+        <div className="gkof-profile-row"><span className="k">{session.role === 'faculty' ? 'Faculty ID' : 'Warden / Admin ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
+        <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ textTransform: 'capitalize' }}>{session.role === 'staff' ? 'Warden / Admin' : session.role}</span></div>
         <div className="gkof-profile-row"><span className="k">Designation</span><span className="v">{session.designation || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v">{displayYear}</span></div>

@@ -99,7 +99,7 @@ function normalizeYearKey(y) {
 router.get('/staff', protect, async (req, res) => {
   try {
     if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied. Staff or Faculty only.' });
+      return res.status(403).json({ success: false, message: 'Access denied. Warden/Admin or Faculty only.' });
     }
 
     const allRequests = await OutRequest.find().sort({ createdAt: -1 });
