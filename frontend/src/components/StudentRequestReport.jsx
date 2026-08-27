@@ -25,13 +25,13 @@ function getLogoBase64(url) {
 
 function normalizeYear(y) {
   if (!y) return 'All Years';
-  const s = String(y).trim().toUpperCase();
-  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
-  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
-  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
-  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
-  if (s.includes('ALL')) return 'All Years';
-  return y;
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I Year';
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II Year';
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III Year';
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV Year';
+  if (/ALL/i.test(s)) return 'All Years';
+  return s;
 }
 
 function formatStatus(status) {
@@ -135,6 +135,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         map.set(regKey, {
           name: r.name || 'N/A',
           reg: r.reg || r.studentId || '—',
+          phone: r.studentPhone || r.phone || '—',
           department: r.department || '—',
           year: normalizeYear(r.year),
           total: 0,
@@ -144,6 +145,9 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         });
       }
       const item = map.get(regKey);
+      if (item.phone === '—' && (r.studentPhone || r.phone)) {
+        item.phone = r.studentPhone || r.phone;
+      }
       item.total += 1;
       const cat = getStatusCategory(r.status);
       if (cat === 'approved') item.approved += 1;
@@ -261,10 +265,11 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       y += 14;
 
       const statHeaders = [
-        { name: '#', width: 25 },
-        { name: 'Student Name', width: 145 },
-        { name: 'Register No.', width: 100 },
-        { name: 'Dept & Year', width: 95 },
+        { name: '#', width: 20 },
+        { name: 'Student Name', width: 105 },
+        { name: 'Register No.', width: 85 },
+        { name: 'Phone Number', width: 75 },
+        { name: 'Dept & Year', width: 80 },
         { name: 'Total', width: 40 },
         { name: 'Approved', width: 40 },
         { name: 'Pending', width: 40 },
@@ -323,13 +328,14 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           doc.text(st.name, curX, y + 13); curX += statHeaders[1].width;
           doc.setFont('helvetica', 'normal');
           doc.text(st.reg, curX, y + 13); curX += statHeaders[2].width;
-          doc.text(`${st.department} (${st.year})`, curX, y + 13); curX += statHeaders[3].width;
+          doc.text(st.phone || '—', curX, y + 13); curX += statHeaders[3].width;
+          doc.text(`${st.department} (${st.year})`, curX, y + 13); curX += statHeaders[4].width;
           doc.setFont('helvetica', 'bold');
-          doc.text(String(st.total), curX, y + 13); curX += statHeaders[4].width;
+          doc.text(String(st.total), curX, y + 13); curX += statHeaders[5].width;
           doc.setTextColor(19, 115, 51);
-          doc.text(String(st.approved), curX, y + 13); curX += statHeaders[5].width;
+          doc.text(String(st.approved), curX, y + 13); curX += statHeaders[6].width;
           doc.setTextColor(176, 96, 0);
-          doc.text(String(st.pending), curX, y + 13); curX += statHeaders[6].width;
+          doc.text(String(st.pending), curX, y + 13); curX += statHeaders[7].width;
           doc.setTextColor(197, 34, 31);
           doc.text(String(st.rejected), curX, y + 13);
 
@@ -354,13 +360,14 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       y += 14;
 
       const logHeaders = [
-        { name: '#', width: 22 },
-        { name: 'Student Name & Reg No.', width: 110 },
-        { name: 'Dept / Year', width: 68 },
-        { name: 'Out Time', width: 85 },
-        { name: 'Return Time', width: 85 },
-        { name: 'Destination / Purpose', width: 95 },
-        { name: 'Status', width: 60 }
+        { name: '#', width: 20 },
+        { name: 'Student Name & Reg No.', width: 95 },
+        { name: 'Phone Number', width: 65 },
+        { name: 'Dept / Year', width: 65 },
+        { name: 'Out Time', width: 75 },
+        { name: 'Return Time', width: 75 },
+        { name: 'Destination / Purpose', width: 75 },
+        { name: 'Status', width: 55 }
       ];
 
       function drawLogTableHeader(curY) {
@@ -387,6 +394,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       } else {
         filteredRequests.forEach((r, idx) => {
           const nameReg = `${r.name || 'N/A'}\nReg: ${r.reg || '—'}`;
+          const phoneStr = r.studentPhone || r.phone || '—';
           const deptYr = `${r.department || '—'}\n${normalizeYear(r.year)}`;
           const outTime = r.fromDate || '—';
           const retTime = r.toDate || '—';
@@ -394,9 +402,9 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           const statusText = formatStatus(r.status);
 
           const linesName = doc.splitTextToSize(nameReg, logHeaders[1].width - 6);
-          const linesDest = doc.splitTextToSize(destReason, logHeaders[5].width - 6);
-          const linesOut = doc.splitTextToSize(outTime, logHeaders[3].width - 6);
-          const linesRet = doc.splitTextToSize(retTime, logHeaders[4].width - 6);
+          const linesDest = doc.splitTextToSize(destReason, logHeaders[6].width - 6);
+          const linesOut = doc.splitTextToSize(outTime, logHeaders[4].width - 6);
+          const linesRet = doc.splitTextToSize(retTime, logHeaders[5].width - 6);
 
           const maxLines = Math.max(linesName.length, linesDest.length, linesOut.length, linesRet.length, 1);
           const rowH = Math.max(22, maxLines * 11 + 8);
@@ -425,11 +433,12 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           let curX = 40;
           doc.text(String(idx + 1), curX, y + 13); curX += logHeaders[0].width;
           doc.text(linesName, curX, y + 11); curX += logHeaders[1].width;
-          const linesDept = doc.splitTextToSize(deptYr, logHeaders[2].width - 6);
-          doc.text(linesDept, curX, y + 11); curX += logHeaders[2].width;
-          doc.text(linesOut, curX, y + 11); curX += logHeaders[3].width;
-          doc.text(linesRet, curX, y + 11); curX += logHeaders[4].width;
-          doc.text(linesDest, curX, y + 11); curX += logHeaders[5].width;
+          doc.text(phoneStr, curX, y + 11); curX += logHeaders[2].width;
+          const linesDept = doc.splitTextToSize(deptYr, logHeaders[3].width - 6);
+          doc.text(linesDept, curX, y + 11); curX += logHeaders[3].width;
+          doc.text(linesOut, curX, y + 11); curX += logHeaders[4].width;
+          doc.text(linesRet, curX, y + 11); curX += logHeaders[5].width;
+          doc.text(linesDest, curX, y + 11); curX += logHeaders[6].width;
 
           const badgeCat = getStatusCategory(r.status);
           if (badgeCat === 'approved') doc.setTextColor(19, 115, 51);
@@ -438,7 +447,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           else doc.setTextColor(60, 64, 67);
 
           doc.setFont('helvetica', 'bold');
-          const linesStatus = doc.splitTextToSize(statusText, logHeaders[6].width - 4);
+          const linesStatus = doc.splitTextToSize(statusText, logHeaders[7].width - 4);
           doc.text(linesStatus, curX, y + 11);
 
           y += rowH;
@@ -658,8 +667,10 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                     <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
                       <th className="p-3">#</th>
                       <th className="p-3">Student Name</th>
-                      <th className="p-3">Register No.</th>
-                      <th className="p-3">Dept &amp; Year</th>
+                      <th className="p-3">Register Number</th>
+                      <th className="p-3">Phone Number</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Year</th>
                       <th className="p-3 text-center">Total Requests</th>
                       <th className="p-3 text-center">Approved</th>
                       <th className="p-3 text-center">Pending</th>
@@ -672,9 +683,9 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                         <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
                         <td className="p-3 font-bold text-gray-900">{st.name}</td>
                         <td className="p-3 font-mono text-gray-600">{st.reg}</td>
-                        <td className="p-3 text-gray-700">
-                          {st.department} <span className="text-[10px] text-gray-400">({st.year})</span>
-                        </td>
+                        <td className="p-3 text-gray-700 font-mono">{st.phone || '—'}</td>
+                        <td className="p-3 text-gray-700">{st.department}</td>
+                        <td className="p-3 text-gray-700 font-semibold">{st.year}</td>
                         <td className="p-3 text-center font-bold text-gray-800 bg-gray-50">{st.total}</td>
                         <td className="p-3 text-center font-bold text-emerald-700 bg-emerald-50/50">{st.approved}</td>
                         <td className="p-3 text-center font-bold text-amber-700 bg-amber-50/50">{st.pending}</td>
@@ -700,6 +711,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                       <th className="p-3">#</th>
                       <th className="p-3">Student Name</th>
                       <th className="p-3">Register No.</th>
+                      <th className="p-3">Phone Number</th>
                       <th className="p-3">Dept &amp; Year</th>
                       <th className="p-3">Out Time</th>
                       <th className="p-3">Return Time</th>
@@ -715,6 +727,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                           <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
                           <td className="p-3 font-semibold text-gray-900">{r.name || '—'}</td>
                           <td className="p-3 font-mono text-gray-600">{r.reg || '—'}</td>
+                          <td className="p-3 text-gray-700 font-mono">{r.studentPhone || r.phone || '—'}</td>
                           <td className="p-3 text-gray-700">
                             <div>{r.department || '—'}</div>
                             <div className="text-[10px] text-gray-400">{normalizeYear(r.year)}</div>

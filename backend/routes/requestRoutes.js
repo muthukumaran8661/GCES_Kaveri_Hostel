@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const OutRequest = require('../models/OutRequest');
+const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
 
 function uid() {
@@ -44,8 +45,9 @@ router.post('/', protect, async (req, res) => {
       owner: req.user.username,
       name: req.user.name,
       reg: req.user.reg || '',
-      department: department || req.user.department || '',
-      year: year || req.user.year || '',
+      studentPhone: req.user.phone || '',
+      department: req.user.department || department || '',
+      year: req.user.year || year || '',
       room,
       dest,
       fromDate,
@@ -74,8 +76,14 @@ router.post('/', protect, async (req, res) => {
 // @access  Private (Student)
 router.get('/student', protect, async (req, res) => {
   try {
-    const requests = await OutRequest.find({ owner: req.user.username }).sort({ createdAt: -1 });
-    return res.json({ success: true, requests });
+    const requests = await OutRequest.find({ owner: req.user.username }).sort({ createdAt: -1 }).lean();
+    const enriched = requests.map(r => ({
+      ...r,
+      department: req.user.department || r.department || '',
+      year: req.user.year || r.year || '',
+      studentPhone: req.user.phone || r.studentPhone || ''
+    }));
+    return res.json({ success: true, requests: enriched });
   } catch (error) {
     console.error('Get student requests error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching student requests.' });
@@ -84,13 +92,13 @@ router.get('/student', protect, async (req, res) => {
 
 function normalizeYearKey(y) {
   if (!y) return '';
-  const s = String(y).trim().toUpperCase();
-  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I';
-  if (s.startsWith('2') || s.startsWith('II')) return 'II';
-  if (s.startsWith('3') || s.startsWith('III')) return 'III';
-  if (s.startsWith('4') || s.startsWith('IV')) return 'IV';
-  if (s.includes('ALL')) return 'ALL';
-  return s;
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I';
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II';
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III';
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV';
+  if (/ALL/i.test(s)) return 'ALL';
+  return s.toUpperCase();
 }
 
 // @route   GET /api/requests/staff
@@ -102,23 +110,40 @@ router.get('/staff', protect, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied. Warden/Admin or Faculty only.' });
     }
 
-    const allRequests = await OutRequest.find().sort({ createdAt: -1 });
+    const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
+
+    // Enrich requests with latest student User profile database data
+    const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name').lean();
+    const userMap = new Map();
+    studentUsers.forEach(u => {
+      if (u.username) userMap.set(u.username.toLowerCase(), u);
+      if (u.reg) userMap.set(u.reg.toLowerCase(), u);
+    });
+
+    const enrichedRequests = allRequests.map(r => {
+      const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
+      return {
+        ...r,
+        department: u?.department || r.department || '',
+        year: u?.year || r.year || '',
+        studentPhone: u?.phone || r.studentPhone || ''
+      };
+    });
 
     // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
     if (req.user.role === 'faculty') {
       const facDept = (req.user.department || '').trim().toLowerCase();
       const facYear = normalizeYearKey(req.user.year);
 
-      const filtered = allRequests.filter(r => {
+      const filtered = enrichedRequests.filter(r => {
         const reqDept = (r.department || '').trim().toLowerCase();
         const reqYear = normalizeYearKey(r.year);
-        // Return only requests where both department AND year match (or faculty assigned to ALL)
         return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
       });
       return res.json({ success: true, requests: filtered });
     }
 
-    return res.json({ success: true, requests: allRequests });
+    return res.json({ success: true, requests: enrichedRequests });
   } catch (error) {
     console.error('Get staff requests error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching staff requests.' });

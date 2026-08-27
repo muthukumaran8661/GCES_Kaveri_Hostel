@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 
 function normalizeYear(y) {
   if (!y) return 'All Years';
-  const s = String(y).trim().toUpperCase();
-  if (s.startsWith('1') || (s.startsWith('I') && !s.startsWith('IV'))) return 'I Year';
-  if (s.startsWith('2') || s.startsWith('II')) return 'II Year';
-  if (s.startsWith('3') || s.startsWith('III')) return 'III Year';
-  if (s.startsWith('4') || s.startsWith('IV')) return 'IV Year';
-  if (s.includes('ALL')) return 'All Years';
-  return y;
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I Year';
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II Year';
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III Year';
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV Year';
+  if (/ALL/i.test(s)) return 'All Years';
+  return s;
 }
 
 export default function StaffProfile({ session, onLogout }) {

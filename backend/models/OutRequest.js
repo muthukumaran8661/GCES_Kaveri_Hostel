@@ -20,6 +20,10 @@ const OutRequestSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  studentPhone: {
+    type: String,
+    default: ''
+  },
   department: {
     type: String,
     default: ''
