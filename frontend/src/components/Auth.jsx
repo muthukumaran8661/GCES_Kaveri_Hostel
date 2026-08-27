@@ -137,16 +137,28 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         homeAddress: homeAddress.trim()
       });
     } else {
-      if (!staffId.trim() || !staffPass.trim() || !confirmPass.trim()) {
-        setError('Please fill in every field.');
+      if (!staffId.trim()) {
+        setError(role === 'faculty' ? 'Faculty ID is required.' : 'Warden / Admin ID is required.');
         return;
       }
-      if (staffPass !== confirmPass) {
-        setError('Choose Password and Confirm Password do not match.');
+      if (!staffEmail.trim()) {
+        setError('Email is required.');
         return;
       }
-      if (staffPhone.trim() && !/^[0-9]{10}$/.test(staffPhone.trim())) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffEmail.trim())) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (!staffPhone.trim()) {
+        setError('Phone number is required.');
+        return;
+      }
+      if (!/^[0-9]{10}$/.test(staffPhone.trim())) {
         setError('Phone number must be exactly 10 digits.');
+        return;
+      }
+      if (!staffPass.trim()) {
+        setError('Password is required.');
         return;
       }
       onSignup({
@@ -155,7 +167,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         password: staffPass.trim(),
         name: staffId.trim(),
         staffId: staffId.trim(),
-        designation: designation.trim() || (role === 'faculty' ? 'Faculty Advisor' : 'Warden'),
+        designation: designation.trim() || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden'),
         department: department.trim(),
         year: year.trim(),
         email: staffEmail.trim(),
