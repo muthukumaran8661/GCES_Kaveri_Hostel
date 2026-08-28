@@ -32,6 +32,59 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Parent mobile number must be exactly 10 digits.' });
     }
 
+    // BACKEND DATE & TIME VALIDATION
+    const now = new Date();
+    const yearNum = now.getFullYear();
+    const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yearNum}-${monthStr}-${dayStr}`;
+    const hoursStr = String(now.getHours()).padStart(2, '0');
+    const minsStr = String(now.getMinutes()).padStart(2, '0');
+    const currentHHmm = `${hoursStr}:${minsStr}`;
+
+    const fromParts = String(fromDate).split('T');
+    const toParts = String(toDate).split('T');
+
+    if (fromParts.length !== 2 || toParts.length !== 2) {
+      return res.status(400).json({ success: false, message: 'Invalid Date & Time format.' });
+    }
+
+    const [fromDatePart, fromTimePart] = fromParts;
+    const [toDatePart, toTimePart] = toParts;
+
+    // 1. OUT DATE & TIME restrictions
+    if (fromDatePart < todayStr) {
+      return res.status(400).json({ success: false, message: 'Out Date cannot be in the past. Only Today and future dates are allowed.' });
+    }
+    if (fromTimePart < '05:00' || fromTimePart > '18:00') {
+      return res.status(400).json({ success: false, message: 'Out Time must be between 05:00 AM and 06:00 PM.' });
+    }
+    if (fromDatePart === todayStr && fromDate < `${todayStr}T${currentHHmm}`) {
+      return res.status(400).json({ success: false, message: 'Out Date & Time cannot be in the past.' });
+    }
+
+    // 2. EXPECTED RETURN restrictions
+    if (toDatePart < todayStr) {
+      return res.status(400).json({ success: false, message: 'Expected Return date cannot be in the past. Only Today and future dates are allowed.' });
+    }
+    if (toTimePart < '05:00' || toTimePart > '18:00') {
+      return res.status(400).json({ success: false, message: 'Expected Return time must be between 05:00 AM and 06:00 PM.' });
+    }
+    if (toDatePart === todayStr && toDate < `${todayStr}T${currentHHmm}`) {
+      return res.status(400).json({ success: false, message: 'Expected Return date & time cannot be in the past.' });
+    }
+
+    // 3. Expected Return > Out Date & Time
+    const fromTimeMs = new Date(fromDate).getTime();
+    const toTimeMs = new Date(toDate).getTime();
+    if (isNaN(fromTimeMs) || isNaN(toTimeMs)) {
+      return res.status(400).json({ success: false, message: 'Invalid Out or Return Date & Time.' });
+    }
+
+    if (toTimeMs <= fromTimeMs) {
+      return res.status(400).json({ success: false, message: 'Expected Return date & time must be after Out Date & Time.' });
+    }
+
     const type = requestType === 'weekday' ? 'weekday' : 'weekend';
     const status = type === 'weekday' ? 'pending_faculty' : 'pending_staff';
     const initialLog = type === 'weekday'

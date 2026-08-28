@@ -20,6 +20,157 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
   const [requestType, setRequestType] = useState('weekend');
   const [reason, setReason] = useState('');
 
+  const [dateError, setDateError] = useState('');
+
+  const getLocalDateString = (d = new Date()) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getLocalTimeString = (d = new Date()) => {
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const validateOutPassDates = (fromDateStr, toDateStr) => {
+    const now = new Date();
+    const todayStr = getLocalDateString(now);
+    const currentHHmm = getLocalTimeString(now);
+
+    if (fromDateStr) {
+      const [fromDatePart, fromTimePart] = fromDateStr.split('T');
+
+      // 1. Date restriction: Today or Future
+      if (fromDatePart < todayStr) {
+        return { isValid: false, error: 'Out Date cannot be in the past. Only Today and future dates are allowed.' };
+      }
+
+      // 3. Time restriction: 05:00 AM to 06:00 PM
+      if (fromTimePart) {
+        if (fromTimePart < '05:00' || fromTimePart > '18:00') {
+          return { isValid: false, error: 'Out Time must be between 05:00 AM and 06:00 PM.' };
+        }
+      }
+
+      // 4. Today time check: prevent selecting a time that has already passed
+      if (fromDatePart === todayStr && fromTimePart) {
+        if (fromDateStr < `${todayStr}T${currentHHmm}`) {
+          return { isValid: false, error: 'Out Date & Time cannot be in the past.' };
+        }
+      }
+    }
+
+    if (toDateStr) {
+      const [toDatePart, toTimePart] = toDateStr.split('T');
+
+      // 1. Date restriction: Today or Future
+      if (toDatePart < todayStr) {
+        return { isValid: false, error: 'Expected Return date cannot be in the past. Only Today and future dates are allowed.' };
+      }
+
+      // 3. Time restriction: 05:00 AM to 06:00 PM
+      if (toTimePart) {
+        if (toTimePart < '05:00' || toTimePart > '18:00') {
+          return { isValid: false, error: 'Expected Return time must be between 05:00 AM and 06:00 PM.' };
+        }
+      }
+
+      // 4. Today time check
+      if (toDatePart === todayStr && toTimePart) {
+        if (toDateStr < `${todayStr}T${currentHHmm}`) {
+          return { isValid: false, error: 'Expected Return date & time cannot be in the past.' };
+        }
+      }
+    }
+
+    // 4. Expected Return must be strictly after Out Date & Time
+    if (fromDateStr && toDateStr) {
+      if (new Date(toDateStr) <= new Date(fromDateStr)) {
+        return { isValid: false, error: 'Expected Return date & time must be after Out Date & Time.' };
+      }
+    }
+
+    return { isValid: true, error: '' };
+  };
+
+  const handleFromDateChange = (val) => {
+    setFromDate(val);
+    const check = validateOutPassDates(val, toDate);
+    setDateError(check.isValid ? '' : check.error);
+  };
+
+  const handleToDateChange = (val) => {
+    setToDate(val);
+    const check = validateOutPassDates(fromDate, val);
+    setDateError(check.isValid ? '' : check.error);
+  };
+
+  const getFromDateMin = () => {
+    const now = new Date();
+    const today = getLocalDateString(now);
+    const nowTime = getLocalTimeString(now);
+
+    if (fromDate) {
+      const [datePart] = fromDate.split('T');
+      if (datePart === today) {
+        const minTime = nowTime > '05:00' ? nowTime : '05:00';
+        return `${today}T${minTime}`;
+      } else if (datePart > today) {
+        return `${datePart}T05:00`;
+      }
+    }
+    const minTime = nowTime > '05:00' ? nowTime : '05:00';
+    return `${today}T${minTime}`;
+  };
+
+  const getFromDateMax = () => {
+    if (fromDate) {
+      const [datePart] = fromDate.split('T');
+      if (datePart) return `${datePart}T18:00`;
+    }
+    return undefined;
+  };
+
+  const getToDateMin = () => {
+    const now = new Date();
+    const today = getLocalDateString(now);
+    const nowTime = getLocalTimeString(now);
+
+    if (toDate) {
+      const [toPart] = toDate.split('T');
+      if (fromDate) {
+        const [fromPart] = fromDate.split('T');
+        if (toPart === fromPart) {
+          return fromDate;
+        }
+      }
+      if (toPart === today) {
+        const minTime = nowTime > '05:00' ? nowTime : '05:00';
+        return `${today}T${minTime}`;
+      } else if (toPart > today) {
+        return `${toPart}T05:00`;
+      }
+    }
+
+    if (fromDate) {
+      return fromDate;
+    }
+
+    const minTime = nowTime > '05:00' ? nowTime : '05:00';
+    return `${today}T${minTime}`;
+  };
+
+  const getToDateMax = () => {
+    if (toDate) {
+      const [datePart] = toDate.split('T');
+      if (datePart) return `${datePart}T18:00`;
+    }
+    return undefined;
+  };
+
   const handleRoomChange = (e) => {
     setRoom(e.target.value.replace(/[^0-9]/g, ''));
   };
@@ -34,6 +185,18 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
       alert('Parent Mobile No. must be exactly 10 digits.');
       return;
     }
+
+    const val = validateOutPassDates(fromDate, toDate);
+    if (!fromDate || !toDate) {
+      alert('Both Out Date & Time and Expected Return are required.');
+      return;
+    }
+    if (!val.isValid) {
+      alert(val.error);
+      setDateError(val.error);
+      return;
+    }
+
     if (saveHomeAddr && dest.trim()) {
       await onSaveProfileAddress(dest.trim());
     }
@@ -52,6 +215,7 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     setFromDate('');
     setToDate('');
     setReason('');
+    setDateError('');
   };
 
   return (
@@ -115,13 +279,32 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
           <div className="gkof-row">
             <div className="gkof-field">
               <label>Out Date &amp; Time</label>
-              <input required type="datetime-local" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <input
+                required
+                type="datetime-local"
+                value={fromDate}
+                min={getFromDateMin()}
+                max={getFromDateMax()}
+                onChange={(e) => handleFromDateChange(e.target.value)}
+              />
             </div>
             <div className="gkof-field">
               <label>Expected Return</label>
-              <input required type="datetime-local" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              <input
+                required
+                type="datetime-local"
+                value={toDate}
+                min={getToDateMin()}
+                max={getToDateMax()}
+                onChange={(e) => handleToDateChange(e.target.value)}
+              />
             </div>
           </div>
+          {dateError && (
+            <div style={{ color: '#c5221f', backgroundColor: '#fce8e6', border: '1px solid #fad2cf', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, marginTop: '8px' }}>
+              ⚠️ {dateError}
+            </div>
+          )}
 
           <div className="gkof-row">
             <div className="gkof-field">
