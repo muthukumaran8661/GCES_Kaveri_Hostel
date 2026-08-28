@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
 import logo from './../assets/logo.png';
 
 function getLogoBase64(url) {
@@ -39,9 +40,9 @@ function formatStatus(status) {
     case 'pending_faculty': return 'Pending Faculty';
     case 'pending_staff': return 'Pending Warden';
     case 'notifying_parent': return 'Calling Parent';
-    case 'approved_final': return 'Approved';
-    case 'returned': return 'Returned';
-    case 'faculty_rejected': return 'Faculty Rejected';
+    case 'approved_final': return 'Approved — Out';
+    case 'returned': return 'Returned Safe';
+    case 'faculty_rejected': return 'Faculty Declined';
     case 'staff_rejected': return 'Warden Declined';
     case 'parent_rejected': return 'Parent Declined';
     default: return status || '—';
@@ -63,6 +64,140 @@ function getStatusBadgeStyle(status) {
   return { bg: '#F1F3F4', color: '#3C4043', border: '#DADCE0' };
 }
 
+function getApprovalHistory(r) {
+  const isWeekday = r.type === 'weekday';
+  
+  let facultyStatus = 'N/A (Weekend Pass)';
+  let wardenStatus = 'Pending';
+  let finalStatus = 'Pending Approval';
+  let rejectionReason = r.rejectionReason || '';
+
+  if (!rejectionReason && r.log && Array.isArray(r.log)) {
+    const rejLog = r.log.find(l => l.toLowerCase().includes('declined') || l.toLowerCase().includes('rejected'));
+    if (rejLog) rejectionReason = rejLog;
+  }
+
+  if (isWeekday) {
+    if (r.status === 'pending_faculty') {
+      facultyStatus = 'Pending';
+      wardenStatus = 'Pending';
+      finalStatus = 'Awaiting Faculty Advisor';
+    } else if (r.status === 'faculty_rejected') {
+      facultyStatus = 'Declined' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'N/A';
+      finalStatus = 'Faculty Declined';
+    } else if (r.status === 'pending_staff') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Pending';
+      finalStatus = 'Awaiting Warden';
+    } else if (r.status === 'staff_rejected') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Declined' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Warden Declined';
+    } else if (r.status === 'notifying_parent') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Calling Parent';
+    } else if (r.status === 'parent_rejected') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Parent Declined';
+    } else if (r.status === 'approved_final') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Approved — Out';
+    } else if (r.status === 'returned') {
+      facultyStatus = 'Approved' + (r.facultyActionBy ? ` (${r.facultyActionBy})` : '');
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Returned Safe';
+    }
+  } else {
+    facultyStatus = 'N/A (Weekend Pass)';
+    if (r.status === 'pending_staff' || r.status === 'pending_faculty') {
+      wardenStatus = 'Pending';
+      finalStatus = 'Awaiting Warden';
+    } else if (r.status === 'staff_rejected' || r.status === 'faculty_rejected') {
+      wardenStatus = 'Declined' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Warden Declined';
+    } else if (r.status === 'notifying_parent') {
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Calling Parent';
+    } else if (r.status === 'parent_rejected') {
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Parent Declined';
+    } else if (r.status === 'approved_final') {
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Approved — Out';
+    } else if (r.status === 'returned') {
+      wardenStatus = 'Approved' + (r.wardenActionBy ? ` (${r.wardenActionBy})` : '');
+      finalStatus = 'Returned Safe';
+    }
+  }
+
+  return { facultyStatus, wardenStatus, finalStatus, rejectionReason: rejectionReason || '—' };
+}
+
+export function exportRequestsToExcel(records) {
+  const exportData = records.map((r, index) => {
+    const history = getApprovalHistory(r);
+    const reqDate = r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : '—';
+    return {
+      '#': index + 1,
+      'Student Name': r.name || '—',
+      'Register Number': r.reg || r.studentId || '—',
+      'Student Phone Number': r.studentPhone || r.phone || '—',
+      'Department': r.department || '—',
+      'Year': normalizeYear(r.year),
+      'Hostel / Room No.': r.room || '—',
+      'Destination / Home Address': r.dest || '—',
+      'Out Date & Time': r.fromDate || '—',
+      'Expected Return': r.toDate || '—',
+      'Parent Mobile Number': r.parentPhone || '—',
+      'Request Date': reqDate,
+      'Request ID': r.requestId || r.id || '—',
+      'Faculty Advisor Status': history.facultyStatus,
+      'Warden Status': history.wardenStatus,
+      'Final Status': history.finalStatus,
+      'Rejection Reason (if applicable)': history.rejectionReason
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+  worksheet['!cols'] = [
+    { wch: 6 },   // #
+    { wch: 22 },  // Student Name
+    { wch: 18 },  // Register Number
+    { wch: 18 },  // Student Phone Number
+    { wch: 16 },  // Department
+    { wch: 12 },  // Year
+    { wch: 18 },  // Hostel / Room No.
+    { wch: 32 },  // Destination / Home Address
+    { wch: 20 },  // Out Date & Time
+    { wch: 20 },  // Expected Return
+    { wch: 20 },  // Parent Mobile Number
+    { wch: 22 },  // Request Date
+    { wch: 14 },  // Request ID
+    { wch: 24 },  // Faculty Advisor Status
+    { wch: 24 },  // Warden Status
+    { wch: 24 },  // Final Status
+    { wch: 30 }   // Rejection Reason
+  ];
+
+  worksheet['!views'] = [{ state: 'frozen', xSplit: 0, ySplit: 1, activePane: 'bottomLeft', topLeftCell: 'A2' }];
+
+  if (exportData.length > 0) {
+    worksheet['!autofilter'] = { ref: `A1:Q${exportData.length + 1}` };
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Student Out Pass Report');
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const filename = `GCES_Student_Outpass_Report_${todayStr}.xlsx`;
+  XLSX.writeFile(workbook, filename);
+}
+
 export default function StudentRequestReport({ session, requests = [], onClose, onRefresh }) {
   const isFaculty = session && session.role === 'faculty';
   const facDept = session?.department || 'CSE';
@@ -73,7 +208,10 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
   const [filterYear, setFilterYear] = useState(isFaculty ? (facYear === 'All Years' ? 'ALL' : facYear) : 'ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterDate, setFilterDate] = useState('');
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'detailed'
+  const [fromDateFilter, setFromDateFilter] = useState('');
+  const [toDateFilter, setToDateFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('detailed'); // 'detailed' | 'summary'
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Scoped & Filtered Requests
@@ -104,7 +242,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         if (r.status !== 'returned') return false;
       }
 
-      // Date filter
+      // Single Date filter
       if (filterDate) {
         const fromD = r.fromDate || '';
         const createdD = r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : '';
@@ -113,9 +251,26 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         }
       }
 
+      // Date Range Filter (From Date -> To Date)
+      if (fromDateFilter || toDateFilter) {
+        const reqDateStr = r.fromDate ? r.fromDate.split('T')[0] : (r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : '');
+        if (fromDateFilter && reqDateStr < fromDateFilter) return false;
+        if (toDateFilter && reqDateStr > toDateFilter) return false;
+      }
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = (r.name || '').toLowerCase().includes(q);
+        const regMatch = (r.reg || r.studentId || '').toLowerCase().includes(q);
+        const idMatch = (r.requestId || r.id || '').toLowerCase().includes(q);
+        const destMatch = (r.dest || '').toLowerCase().includes(q);
+        if (!nameMatch && !regMatch && !idMatch && !destMatch) return false;
+      }
+
       return true;
     });
-  }, [requests, isFaculty, facDept, facYear, filterDept, filterYear, filterStatus, filterDate]);
+  }, [requests, isFaculty, facDept, facYear, filterDept, filterYear, filterStatus, filterDate, fromDateFilter, toDateFilter, searchQuery]);
 
   // Overall Statistics
   const stats = useMemo(() => {
@@ -175,7 +330,6 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       const logoData = await getLogoBase64(logo);
 
       function drawHeader(pageNum) {
-        // Maroon Header Bar
         doc.setFillColor(...maroon);
         doc.rect(0, 0, pageW, 72, 'F');
 
@@ -195,7 +349,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
         doc.setTextColor(243, 220, 166);
-        doc.text('GCES Kaveri Girls Hostel — Student Out Pass Request Report', textX, 47);
+        doc.text('GCES Kaveri Girls Hostel — Student Out Pass Request & Approval Report', textX, 47);
 
         doc.setFontSize(8.5);
         doc.setTextColor(255, 255, 255);
@@ -207,11 +361,10 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
 
       let y = 90;
 
-      // Report Title & Timestamp
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
       doc.setTextColor(...ink);
-      doc.text('Student Out Pass Request Report', 35, y);
+      doc.text('Student Out Pass Request & Approval Report', 35, y);
 
       const nowStr = new Date().toLocaleString('en-IN', {
         dateStyle: 'medium',
@@ -257,106 +410,11 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
 
       y += 50;
 
-      // SECTION 1: Student-Wise Statistics Table
+      // SECTION: Detailed Log Records
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(...ink);
-      doc.text('1. Student-Wise Request Statistics', 35, y);
-      y += 14;
-
-      const statHeaders = [
-        { name: '#', width: 20 },
-        { name: 'Student Name', width: 105 },
-        { name: 'Register No.', width: 85 },
-        { name: 'Phone Number', width: 75 },
-        { name: 'Dept & Year', width: 80 },
-        { name: 'Total', width: 40 },
-        { name: 'Approved', width: 40 },
-        { name: 'Pending', width: 40 },
-        { name: 'Rejected', width: 40 }
-      ];
-
-      function drawStatTableHeader(curY) {
-        doc.setFillColor(42, 33, 64);
-        doc.rect(35, curY, pageW - 70, 20, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(255, 255, 255);
-        let x = 40;
-        statHeaders.forEach(h => {
-          doc.text(h.name, x, curY + 13);
-          x += h.width;
-        });
-        return curY + 20;
-      }
-
-      y = drawStatTableHeader(y);
-
-      if (studentWiseStats.length === 0) {
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(8.5);
-        doc.setTextColor(...inkSoft);
-        doc.text('No student records found.', 35 + (pageW - 70) / 2, y + 20, { align: 'center' });
-        y += 35;
-      } else {
-        studentWiseStats.forEach((st, idx) => {
-          const rowH = 20;
-          if (y + rowH > pageH - 45) {
-            currentPage++;
-            doc.addPage();
-            drawHeader(currentPage);
-            y = 85;
-            y = drawStatTableHeader(y);
-          }
-
-          if (idx % 2 === 1) {
-            doc.setFillColor(248, 246, 240);
-            doc.rect(35, y, pageW - 70, rowH, 'F');
-          }
-
-          doc.setDrawColor(230, 226, 215);
-          doc.setLineWidth(0.5);
-          doc.line(35, y + rowH, pageW - 35, y + rowH);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8);
-          doc.setTextColor(...ink);
-
-          let curX = 40;
-          doc.text(String(idx + 1), curX, y + 13); curX += statHeaders[0].width;
-          doc.setFont('helvetica', 'bold');
-          doc.text(st.name, curX, y + 13); curX += statHeaders[1].width;
-          doc.setFont('helvetica', 'normal');
-          doc.text(st.reg, curX, y + 13); curX += statHeaders[2].width;
-          doc.text(st.phone || '—', curX, y + 13); curX += statHeaders[3].width;
-          doc.text(`${st.department} (${st.year})`, curX, y + 13); curX += statHeaders[4].width;
-          doc.setFont('helvetica', 'bold');
-          doc.text(String(st.total), curX, y + 13); curX += statHeaders[5].width;
-          doc.setTextColor(19, 115, 51);
-          doc.text(String(st.approved), curX, y + 13); curX += statHeaders[6].width;
-          doc.setTextColor(176, 96, 0);
-          doc.text(String(st.pending), curX, y + 13); curX += statHeaders[7].width;
-          doc.setTextColor(197, 34, 31);
-          doc.text(String(st.rejected), curX, y + 13);
-
-          y += rowH;
-        });
-      }
-
-      y += 25;
-
-      // SECTION 2: Detailed Out Pass Requests Log Table
-      if (y + 120 > pageH - 45) {
-        currentPage++;
-        doc.addPage();
-        drawHeader(currentPage);
-        y = 85;
-      }
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
-      doc.setTextColor(...ink);
-      doc.text('2. Detailed Student Out Pass Request Records', 35, y);
+      doc.text('Detailed Student Out Pass Request & Approval Records', 35, y);
       y += 14;
 
       const logHeaders = [
@@ -366,7 +424,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         { name: 'Dept / Year', width: 65 },
         { name: 'Out Time', width: 75 },
         { name: 'Return Time', width: 75 },
-        { name: 'Destination / Purpose', width: 75 },
+        { name: 'Destination', width: 75 },
         { name: 'Status', width: 55 }
       ];
 
@@ -454,7 +512,6 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         });
       }
 
-      // Footers
       const totalPages = doc.internal.getNumberOfPages();
       for (let p = 1; p <= totalPages; p++) {
         doc.setPage(p);
@@ -479,30 +536,49 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
     }
   }
 
+  const handleExportExcel = () => {
+    exportRequestsToExcel(filteredRequests);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-[var(--gold-soft)] overflow-hidden my-6 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-[var(--gold-soft)] overflow-hidden my-4 flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="bg-[#9E1B32] text-white p-4 px-6 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📊</span>
             <div>
-              <h2 className="font-serif text-lg font-bold leading-tight">Student Request Report & Analytics</h2>
+              <h2 className="font-serif text-lg font-bold leading-tight">Student Request &amp; Approval Report</h2>
               <p className="text-xs text-gold-soft opacity-90">
                 {isFaculty
                   ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`
-                  : 'Hostel Out Pass Portal — Warden & Admin Report Center'}
+                  : 'Hostel Out Pass Portal — View, filter and export student out pass request and approval data'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Export Current Filtered Data to Excel (.xlsx)"
+            >
+              <span>📊</span> Export Excel
+            </button>
+            <button
+              onClick={generatePDF}
+              disabled={isGeneratingPDF}
+              className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Download PDF Summary"
+            >
+              <span>📥</span> PDF
+            </button>
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Refresh Live Data"
               >
-                🔄 Refresh Data
+                🔄 Refresh
               </button>
             )}
             <button
@@ -515,8 +591,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         </div>
 
         {/* Filters Bar */}
-        <div className="p-4 px-6 bg-[var(--cream-soft)] border-b border-[var(--line)] flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex flex-wrap items-center gap-3 text-xs w-full lg:w-auto">
+        <div className="p-3.5 px-6 bg-[var(--cream-soft)] border-b border-[var(--line)] flex flex-col gap-3 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
             {isFaculty ? (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg font-medium">
                 <span>🔒 Scope Locked:</span>
@@ -582,64 +658,82 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                 className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
               />
               {filterDate && (
-                <button
-                  onClick={() => setFilterDate('')}
-                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
-                  title="Clear Date"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setFilterDate('')} className="text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear Date">✕</button>
               )}
             </div>
           </div>
 
-          {/* Download PDF Button */}
-          <button
-            onClick={generatePDF}
-            disabled={isGeneratingPDF}
-            className="w-full lg:w-auto px-4 py-2 bg-[#9E1B32] hover:bg-[#801427] text-white text-xs font-bold rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-          >
-            <span>📥</span>
-            <span>{isGeneratingPDF ? 'Generating Official PDF...' : 'Download PDF Report'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <label className="font-semibold text-gray-700">From Date:</label>
+              <input
+                type="date"
+                value={fromDateFilter}
+                onChange={e => setFromDateFilter(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="font-semibold text-gray-700">To Date:</label>
+              <input
+                type="date"
+                value={toDateFilter}
+                onChange={e => setToDateFilter(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              />
+              {(fromDateFilter || toDateFilter) && (
+                <button
+                  onClick={() => { setFromDateFilter(''); setToDateFilter(''); }}
+                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                  title="Clear Date Range"
+                >
+                  Clear Range ✕
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+              <label className="font-semibold text-gray-700">Search:</label>
+              <input
+                type="text"
+                placeholder="Search Name, Reg No, Request ID..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear Search">✕</button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 5 Summary Statistics Cards */}
-        <div className="p-4 px-6 grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white flex-shrink-0">
-          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-center">
-            <div className="text-xl font-bold text-indigo-800">{totalStudents}</div>
+        <div className="p-3.5 px-6 grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white flex-shrink-0">
+          <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-center">
+            <div className="text-lg font-bold text-indigo-800">{totalStudents}</div>
             <div className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider mt-0.5">Total Students</div>
           </div>
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-center">
-            <div className="text-xl font-bold text-gray-800">{stats.total}</div>
+          <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-center">
+            <div className="text-lg font-bold text-gray-800">{stats.total}</div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Total Requests</div>
           </div>
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-            <div className="text-xl font-bold text-emerald-700">{stats.approved}</div>
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+            <div className="text-lg font-bold text-emerald-700">{stats.approved}</div>
             <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mt-0.5">Approved</div>
           </div>
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
-            <div className="text-xl font-bold text-amber-700">{stats.pending}</div>
+          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
+            <div className="text-lg font-bold text-amber-700">{stats.pending}</div>
             <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mt-0.5">Pending</div>
           </div>
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-center">
-            <div className="text-xl font-bold text-rose-700">{stats.rejected}</div>
+          <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
+            <div className="text-lg font-bold text-rose-700">{stats.rejected}</div>
             <div className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider mt-0.5">Rejected</div>
           </div>
         </div>
 
         {/* View Switcher Tabs */}
         <div className="px-6 border-b border-gray-200 bg-gray-50/50 flex gap-4 text-xs font-semibold flex-shrink-0">
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'summary'
-                ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span>👥</span> Student Statistics ({studentWiseStats.length})
-          </button>
           <button
             onClick={() => setActiveTab('detailed')}
             className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
@@ -648,13 +742,91 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <span>📋</span> Detailed Out Pass Log ({filteredRequests.length})
+            <span>📋</span> Detailed Approval Report ({filteredRequests.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'summary'
+                ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span>👥</span> Student Summary ({studentWiseStats.length})
           </button>
         </div>
 
-        {/* Tab 1: Student-Wise Statistics Table */}
+        {/* Main Content Area */}
         <div className="p-4 px-6 overflow-y-auto flex-1">
-          {activeTab === 'summary' ? (
+          {activeTab === 'detailed' ? (
+            filteredRequests.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <span className="text-3xl block mb-2">📋</span>
+                <p className="font-semibold text-sm">No student out pass request records match your filters.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
+                  <thead>
+                    <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10px]">
+                      <th className="p-2.5">#</th>
+                      <th className="p-2.5">Student Name</th>
+                      <th className="p-2.5">Register No.</th>
+                      <th className="p-2.5">Student Phone</th>
+                      <th className="p-2.5">Dept</th>
+                      <th className="p-2.5">Year</th>
+                      <th className="p-2.5">Room</th>
+                      <th className="p-2.5">Destination / Address</th>
+                      <th className="p-2.5">Out Time</th>
+                      <th className="p-2.5">Expected Return</th>
+                      <th className="p-2.5">Parent Mobile</th>
+                      <th className="p-2.5">Request ID</th>
+                      <th className="p-2.5">Faculty Status</th>
+                      <th className="p-2.5">Warden Status</th>
+                      <th className="p-2.5">Final Status</th>
+                      <th className="p-2.5">Rejection Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredRequests.map((r, i) => {
+                      const bStyle = getStatusBadgeStyle(r.status);
+                      const history = getApprovalHistory(r);
+                      return (
+                        <tr key={r.requestId || r.id || r._id || i} className="hover:bg-amber-50/40 transition-colors">
+                          <td className="p-2.5 font-semibold text-gray-400">{i + 1}</td>
+                          <td className="p-2.5 font-bold text-gray-900">{r.name || '—'}</td>
+                          <td className="p-2.5 font-mono text-gray-600">{r.reg || '—'}</td>
+                          <td className="p-2.5 text-gray-700 font-mono">{r.studentPhone || r.phone || '—'}</td>
+                          <td className="p-2.5 text-gray-700">{r.department || '—'}</td>
+                          <td className="p-2.5 text-gray-700 font-semibold">{normalizeYear(r.year)}</td>
+                          <td className="p-2.5 text-gray-700">{r.room || '—'}</td>
+                          <td className="p-2.5 text-gray-700 max-w-[180px] truncate" title={r.dest}>{r.dest || '—'}</td>
+                          <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
+                          <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
+                          <td className="p-2.5 text-gray-700 font-mono">{r.parentPhone || '—'}</td>
+                          <td className="p-2.5 font-mono text-xs font-semibold text-indigo-700">{r.requestId || r.id || '—'}</td>
+                          <td className="p-2.5 text-gray-700 font-medium">{history.facultyStatus}</td>
+                          <td className="p-2.5 text-gray-700 font-medium">{history.wardenStatus}</td>
+                          <td className="p-2.5">
+                            <span
+                              className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full border"
+                              style={{ backgroundColor: bStyle.bg, color: bStyle.color, borderColor: bStyle.border }}
+                            >
+                              {formatStatus(r.status)}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-rose-700 text-[11px] max-w-[160px] truncate" title={history.rejectionReason}>
+                            {history.rejectionReason}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            /* Tab 2: Student-Wise Aggregated Statistics Table */
             studentWiseStats.length === 0 ? (
               <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                 <span className="text-3xl block mb-2">🎓</span>
@@ -696,63 +868,6 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                 </table>
               </div>
             )
-          ) : (
-            /* Tab 2: Detailed Out Pass Requests Log Table */
-            filteredRequests.length === 0 ? (
-              <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <span className="text-3xl block mb-2">📋</span>
-                <p className="font-semibold text-sm">No student request records match your filters.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
-                      <th className="p-3">#</th>
-                      <th className="p-3">Student Name</th>
-                      <th className="p-3">Register No.</th>
-                      <th className="p-3">Phone Number</th>
-                      <th className="p-3">Dept &amp; Year</th>
-                      <th className="p-3">Out Time</th>
-                      <th className="p-3">Return Time</th>
-                      <th className="p-3">Reason / Purpose</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {filteredRequests.map((r, i) => {
-                      const bStyle = getStatusBadgeStyle(r.status);
-                      return (
-                        <tr key={r.requestId || r.id || r._id || i} className="hover:bg-amber-50/40 transition-colors">
-                          <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
-                          <td className="p-3 font-semibold text-gray-900">{r.name || '—'}</td>
-                          <td className="p-3 font-mono text-gray-600">{r.reg || '—'}</td>
-                          <td className="p-3 text-gray-700 font-mono">{r.studentPhone || r.phone || '—'}</td>
-                          <td className="p-3 text-gray-700">
-                            <div>{r.department || '—'}</div>
-                            <div className="text-[10px] text-gray-400">{normalizeYear(r.year)}</div>
-                          </td>
-                          <td className="p-3 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
-                          <td className="p-3 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
-                          <td className="p-3 text-gray-700 max-w-[200px] truncate" title={r.reason || r.dest}>
-                            <b>{r.dest || '—'}</b>
-                            {r.reason && <span className="text-gray-500 text-[11px] block">{r.reason}</span>}
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className="inline-block px-2.5 py-1 text-[10.5px] font-semibold rounded-full border"
-                              style={{ backgroundColor: bStyle.bg, color: bStyle.color, borderColor: bStyle.border }}
-                            >
-                              {formatStatus(r.status)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
           )}
         </div>
 
@@ -761,12 +876,20 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           <div>
             Showing <b>{studentWiseStats.length}</b> unique students | <b>{filteredRequests.length}</b> out pass requests
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer"
-          >
-            Close Report
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <span>📊</span> Export Excel (.xlsx)
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer"
+            >
+              Close Report
+            </button>
+          </div>
         </div>
       </div>
     </div>

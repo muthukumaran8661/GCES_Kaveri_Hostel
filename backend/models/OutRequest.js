@@ -86,6 +86,24 @@ const OutRequestSchema = new mongoose.Schema({
   log: [{
     type: String
   }],
+  facultyActionBy: {
+    type: String,
+    default: ''
+  },
+  facultyActionAt: {
+    type: Date
+  },
+  wardenActionBy: {
+    type: String,
+    default: ''
+  },
+  wardenActionAt: {
+    type: Date
+  },
+  rejectionReason: {
+    type: String,
+    default: ''
+  },
   gpsLocations: [{
     lat: { type: Number, required: true },
     lng: { type: Number, required: true },

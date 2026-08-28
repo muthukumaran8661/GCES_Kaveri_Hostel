@@ -249,19 +249,29 @@ router.patch('/:id/action', protect, async (req, res) => {
     switch (action) {
       case 'faculty_approved':
         request.status = 'pending_staff';
+        request.facultyActionBy = req.user.name || req.user.username;
+        request.facultyActionAt = new Date();
         request.log.push(`Faculty Advisor (${req.user.name}) approved — forwarded to Warden`);
         break;
       case 'faculty_rejected':
         request.status = 'faculty_rejected';
+        request.facultyActionBy = req.user.name || req.user.username;
+        request.facultyActionAt = new Date();
+        request.rejectionReason = req.body.reason || 'Declined by Faculty Advisor';
         request.log.push(`Faculty Advisor (${req.user.name}) declined the request`);
         break;
       case 'staff_approved':
         request.status = 'notifying_parent';
+        request.wardenActionBy = req.user.name || req.user.username;
+        request.wardenActionAt = new Date();
         request.callAttempts = 1;
         request.log.push(`Warden (${req.user.name}) approved — SMS/WhatsApp link sent, auto-call started (attempt 1)`);
         break;
       case 'staff_rejected':
         request.status = 'staff_rejected';
+        request.wardenActionBy = req.user.name || req.user.username;
+        request.wardenActionAt = new Date();
+        request.rejectionReason = req.body.reason || 'Declined by Warden';
         request.log.push(`Warden (${req.user.name}) declined the request`);
         break;
       case 'parent_approved':
@@ -270,6 +280,7 @@ router.patch('/:id/action', protect, async (req, res) => {
         break;
       case 'parent_rejected':
         request.status = 'parent_rejected';
+        request.rejectionReason = req.body.reason || 'Declined by Parent';
         request.log.push('Parent declined the request');
         break;
       case 'returned':
@@ -296,6 +307,60 @@ router.patch('/:id/action', protect, async (req, res) => {
   } catch (error) {
     console.error('Update request action error:', error);
     return res.status(500).json({ success: false, message: 'Server error updating request action.' });
+  }
+});
+
+// @route   GET /api/requests/report
+// @desc    Get detailed report & analytics data with strict RBAC
+// @access  Private (Warden/Faculty/Admin only)
+router.get('/report', protect, async (req, res) => {
+  try {
+    if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied. Report generation is restricted to authorized Staff and Faculty Advisors.' });
+    }
+
+    if (req.user.role === 'faculty' && req.user.status === 'inactive') {
+      return res.status(403).json({ success: false, message: '403 Forbidden: Your faculty account is inactive. Please contact Administrator.' });
+    }
+
+    const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
+    const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name room homeAddress').lean();
+    
+    const userMap = new Map();
+    studentUsers.forEach(u => {
+      if (u.username) userMap.set(u.username.toLowerCase(), u);
+      if (u.reg) userMap.set(u.reg.toLowerCase(), u);
+    });
+
+    const enriched = allRequests.map(r => {
+      const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
+      return {
+        ...r,
+        department: u?.department || r.department || '',
+        year: u?.year || r.year || '',
+        studentPhone: u?.phone || r.studentPhone || '',
+        room: r.room || u?.room || '',
+        dest: r.dest || u?.homeAddress || ''
+      };
+    });
+
+    if (req.user.role === 'faculty') {
+      const facDept = (req.user.department || '').trim().toLowerCase();
+      const facYear = normalizeYearKey(req.user.year);
+
+      const scopedRequests = enriched.filter(r => {
+        const reqDept = (r.department || '').trim().toLowerCase();
+        const reqYear = normalizeYearKey(r.year);
+        return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
+      });
+
+      return res.json({ success: true, requests: scopedRequests });
+    }
+
+    return res.json({ success: true, requests: enriched });
+  } catch (error) {
+    console.error('Get report data error:', error);
+    return res.status(500).json({ success: false, message: 'Server error generating report data.' });
   }
 });
 

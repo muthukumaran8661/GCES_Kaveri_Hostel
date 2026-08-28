@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
-import StudentRequestReport from './StudentRequestReport';
+import StudentRequestReport, { exportRequestsToExcel } from './StudentRequestReport';
 
 async function apiFetch(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -123,7 +123,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         </div>
       )}
 
-      {/* Student Request Report Quick Access Card */}
+      {/* Student Request & Approval Report Quick Access Card */}
       <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -132,20 +132,37 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px', color: '#FFF' }}>
-                Student Request Report &amp; Analytics
+                Student Request &amp; Approval Report
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gold-soft)', marginTop: '2px' }}>
-                {isFaculty ? `View and download PDF out pass reports for ${session.department || 'CSE'} (${facYearDisplay})` : 'View, filter, and download official PDF reports for student out requests'}
+                View, filter and export student out pass request and approval data
               </div>
             </div>
           </div>
-          <button
-            className="gkof-btn"
-            style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 18px', fontSize: '13px', cursor: 'pointer' }}
-            onClick={() => setShowReportModal(true)}
-          >
-            📊 Request Report
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="gkof-btn"
+              style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+              onClick={() => setShowReportModal(true)}
+            >
+              👁️ View Report
+            </button>
+            <button
+              className="gkof-btn"
+              style={{ background: '#16a34a', color: '#FFF', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+              onClick={() => {
+                let scoped = requests;
+                if (isFaculty) {
+                  const facDept = (session?.department || '').trim().toLowerCase();
+                  const facYr = normalizeYear(session?.year);
+                  scoped = requests.filter(r => (r.department || '').trim().toLowerCase() === facDept && (facYr === 'All Years' || normalizeYear(r.year) === facYr));
+                }
+                exportRequestsToExcel(scoped);
+              }}
+            >
+              📊 Export Excel
+            </button>
+          </div>
         </div>
       </div>
 
