@@ -255,11 +255,11 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
       doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
       doc.setTextColor(...inkSoft);
       doc.text(label, labelX, y);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(11.5);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
       doc.setTextColor(...ink);
-      const lines = doc.splitTextToSize(String(value || '—'), pageW - valueX - 40);
+      const lines = doc.splitTextToSize(String(value || '—'), pageW - valueX - 165);
       doc.text(lines, valueX, y);
-      y += Math.max(20, lines.length * 15);
+      y += Math.max(19, lines.length * 14);
     }
 
     row('Student Name', r.name);
@@ -299,6 +299,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
   }
 
   const reqYearDisplay = normalizeYear(r.year);
+  const showQrOnPass = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
 
   return (
     <div className="gkof-ticket">
@@ -308,18 +309,44 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
             {r.status === 'returned' ? <>BACK<br />SAFE</> : <>OUT<br />PASS<br />OK</>}
           </div>
         )}
-        <div className="gkof-name">{r.name}</div>
-        <div className="gkof-meta">{r.reg} · {r.department || 'CSE'}{reqYearDisplay ? ` (${reqYearDisplay})` : ''} · Room {r.room || '—'} · {typeLabel}</div>
-        <div className="gkof-detail-line">
-          <b>Dept &amp; Year:</b> {r.department || '—'} ({reqYearDisplay}) &nbsp;·&nbsp; <b>Destination:</b> {r.dest} &nbsp;·&nbsp; <b>Travel:</b> {r.travel}<br />
-          <b>Out:</b> {fmtDate(r.fromDate)} &nbsp;→&nbsp; <b>Return:</b> {fmtDate(r.toDate)}<br />
-          <b>Reason:</b> {r.reason}<br />
-          <b>Parent No.:</b> {r.parentPhone}
+
+        <div className={`flex flex-col ${showQrOnPass ? 'md:flex-row justify-between items-start gap-4' : ''}`}>
+          {/* Left Column: Student Information */}
+          <div className="flex-1 min-w-0 w-full">
+            <div className="gkof-name">{r.name}</div>
+            <div className="gkof-meta">{r.reg} · {r.department || 'CSE'}{reqYearDisplay ? ` (${reqYearDisplay})` : ''} · Room {r.room || '—'} · {typeLabel}</div>
+            <div className="gkof-detail-line">
+              <b>Dept &amp; Year:</b> {r.department || '—'} ({reqYearDisplay}) &nbsp;·&nbsp; <b>Destination:</b> {r.dest} &nbsp;·&nbsp; <b>Travel:</b> {r.travel}<br />
+              <b>Out:</b> {fmtDate(r.fromDate)} &nbsp;→&nbsp; <b>Return:</b> {fmtDate(r.toDate)}<br />
+              <b>Reason:</b> {r.reason}<br />
+              <b>Parent No.:</b> {r.parentPhone}
+            </div>
+            {renderTimeline()}
+            <span className={`gkof-status ${meta.cls}`}>{meta.label}</span>
+            {isAccepted && <div className="gkof-outcome accepted">✅ Your Request was successfully Accepted</div>}
+            {isDeclined && <div className="gkof-outcome declined">❌ Your Request was declined</div>}
+          </div>
+
+          {/* Right Column: Dedicated QR Card Container (Student Final Pass Only) */}
+          {showQrOnPass && (
+            <div className="gkof-qr-card-container w-full md:w-44 flex-shrink-0 flex flex-col items-center justify-center p-3 bg-[#FAF8F2] border border-[#D9A441] rounded-xl text-center shadow-xs mt-3 md:mt-0">
+              <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-xs mb-1.5">
+                <QRCodeSVG value={r.qrToken || r.requestId} size={110} level="H" includeMargin={false} />
+              </div>
+              <div className="text-[10px] font-extrabold text-[#9E1B32] uppercase tracking-wider">Official Gate QR</div>
+              <div className="font-mono text-[11.5px] font-bold text-[#2A2140] mt-0.5">{r.qrToken || r.requestId}</div>
+              <div className="text-[10px] font-semibold mt-1">
+                {r.status === 'returned' ? (
+                  <span className="text-gray-600">🔴 RETURNED SAFE</span>
+                ) : r.qrStatus === 'OUT' ? (
+                  <span className="text-amber-700 font-bold">🟡 CURRENTLY OUT</span>
+                ) : (
+                  <span className="text-emerald-700 font-bold">🟢 ACTIVE FOR GATE</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        {renderTimeline()}
-        <span className={`gkof-status ${meta.cls}`}>{meta.label}</span>
-        {isAccepted && <div className="gkof-outcome accepted">✅ Your Request was successfully Accepted</div>}
-        {isDeclined && <div className="gkof-outcome declined">❌ Your Request was declined</div>}
 
         {/* GPS Tracking Section */}
         {(canShareLocation || canViewLocation) && (

@@ -757,8 +757,6 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                         <th className="p-2.5">Destination / Address</th>
                         <th className="p-2.5">Out Time</th>
                         <th className="p-2.5">Expected Return</th>
-                        <th className="p-2.5">QR Status</th>
-                        <th className="p-2.5">Scans</th>
                         <th className="p-2.5">Request ID</th>
                         <th className="p-2.5">Faculty Status</th>
                         <th className="p-2.5">Warden Status</th>
@@ -783,8 +781,6 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                             <td className="p-2.5 text-gray-700 max-w-[180px] truncate" title={r.dest}>{r.dest || '—'}</td>
                             <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
                             <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
-                            <td className="p-2.5 font-semibold text-indigo-900">{r.qrStatus || 'ACTIVE'}</td>
-                            <td className="p-2.5 font-bold text-gray-700">{r.scanCount || 0}/2</td>
                             <td className="p-2.5 font-mono text-xs font-semibold text-indigo-700">{r.requestId || r.id || '—'}</td>
                             <td className="p-2.5 text-gray-700 font-medium">{history.facultyStatus}</td>
                             <td className="p-2.5 text-gray-700 font-medium">{history.wardenStatus}</td>
