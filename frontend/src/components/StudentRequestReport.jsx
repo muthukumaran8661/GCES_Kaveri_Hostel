@@ -349,7 +349,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
         doc.setTextColor(243, 220, 166);
-        doc.text('GCES Kaveri Girls Hostel — Student Out Pass Request & Approval Report', textX, 47);
+        doc.text('GCES Kaveri Girls Hostel — Report', textX, 47);
 
         doc.setFontSize(8.5);
         doc.setTextColor(255, 255, 255);
@@ -364,7 +364,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
       doc.setTextColor(...ink);
-      doc.text('Student Out Pass Request & Approval Report', 35, y);
+      doc.text('Report', 35, y);
 
       const nowStr = new Date().toLocaleString('en-IN', {
         dateStyle: 'medium',
@@ -548,7 +548,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           <div className="flex items-center gap-3">
             <span className="text-2xl">📊</span>
             <div>
-              <h2 className="font-serif text-lg font-bold leading-tight">Student Request &amp; Approval Report</h2>
+              <h2 className="font-serif text-lg font-bold leading-tight">Report</h2>
               <p className="text-xs text-gold-soft opacity-90">
                 {isFaculty
                   ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`

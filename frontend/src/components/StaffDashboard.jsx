@@ -123,7 +123,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         </div>
       )}
 
-      {/* Student Request & Approval Report Quick Access Card */}
+      {/* Report Quick Access Card */}
       <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -132,7 +132,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px', color: '#FFF' }}>
-                Student Request &amp; Approval Report
+                Report
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gold-soft)', marginTop: '2px' }}>
                 View, filter and export student out pass request and approval data
