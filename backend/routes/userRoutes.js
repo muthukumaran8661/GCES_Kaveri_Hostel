@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
 
 // @route   PUT /api/users/profile
 // @desc    Update user profile details (e.g. homeAddress, department, year)
@@ -58,7 +58,7 @@ router.put('/profile', protect, async (req, res) => {
 // @route   GET /api/users/staff-list
 // @desc    Get list of all faculty and staff users for Admin management
 // @access  Private (Staff/Faculty/Admin)
-router.get('/staff-list', protect, async (req, res) => {
+router.get('/staff-list', protect, protectWardenAllowlist, async (req, res) => {
   try {
     if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied.' });
@@ -78,7 +78,7 @@ router.get('/staff-list', protect, async (req, res) => {
 // @route   PUT /api/users/:id/admin-update
 // @desc    Admin endpoint to update faculty/staff member's department, year, role, or status
 // @access  Private (Staff/Admin)
-router.put('/:id/admin-update', protect, async (req, res) => {
+router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res) => {
   try {
     if (!['staff', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied. Admin or Warden access required.' });

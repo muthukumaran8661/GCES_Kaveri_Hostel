@@ -186,12 +186,14 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
           >
             Login
           </div>
-          <div
-            className={`gkof-auth-tab ${authMode === 'signup' ? 'active' : ''}`}
-            onClick={() => { setAuthMode('signup'); setError(''); }}
-          >
-            Create Account
-          </div>
+          {role !== 'staff' && (
+            <div
+              className={`gkof-auth-tab ${authMode === 'signup' ? 'active' : ''}`}
+              onClick={() => { setAuthMode('signup'); setError(''); }}
+            >
+              Create Account
+            </div>
+          )}
         </div>
 
         {error && <div className="gkof-auth-error show">{error}</div>}
@@ -221,6 +223,8 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               onClick={() => {
                 setRole('staff');
                 setDepartment('Hostel Administration');
+                setAuthMode('login');
+                setError('');
               }}
             >
               <span className="emoji">🛡️</span>Warden / Admin

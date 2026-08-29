@@ -3,7 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const OutRequest = require('../models/OutRequest');
 const User = require('../models/User');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
 
 function uid() {
   return 'REQ' + Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -157,7 +157,7 @@ function normalizeYearKey(y) {
 // @route   GET /api/requests/staff
 // @desc    Get all requests for staff/faculty dashboard queues
 // @access  Private (Staff/Faculty/Admin)
-router.get('/staff', protect, async (req, res) => {
+router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
   try {
     if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied. Warden/Admin or Faculty only.' });
@@ -206,7 +206,7 @@ router.get('/staff', protect, async (req, res) => {
 // @route   PATCH /api/requests/:id/action
 // @desc    Update request status / log based on action
 // @access  Private (Staff/Faculty/Student)
-router.patch('/:id/action', protect, async (req, res) => {
+router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) => {
   try {
     const { action } = req.body;
     const request = await findRequestById(req.params.id);
@@ -313,7 +313,7 @@ router.patch('/:id/action', protect, async (req, res) => {
 // @route   GET /api/requests/report
 // @desc    Get detailed report & analytics data with strict RBAC
 // @access  Private (Warden/Faculty/Admin only)
-router.get('/report', protect, async (req, res) => {
+router.get('/report', protect, protectWardenAllowlist, async (req, res) => {
   try {
     if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied. Report generation is restricted to authorized Staff and Faculty Advisors.' });

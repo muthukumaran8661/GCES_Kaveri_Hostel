@@ -36,8 +36,30 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const isFaculty = session && session.role === 'faculty';
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
+  const WARDEN_ALLOWLIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+  const userUname = (session?.username || session?.staffId || '').trim().toLowerCase();
+  const isAuthorizedWarden = !isAdminOrWarden || WARDEN_ALLOWLIST.includes(userUname);
+
   const facYearDisplay = normalizeYear(session?.year);
   const [showReportModal, setShowReportModal] = useState(false);
+
+  if (isAdminOrWarden && !isAuthorizedWarden) {
+    return (
+      <div className="gkof-card" style={{ textAlign: 'center', padding: '40px 20px', borderLeft: '4px solid var(--red)' }}>
+        <span style={{ fontSize: '48px', display: 'block', marginBottom: '12px' }}>🛑</span>
+        <h2 style={{ color: 'var(--red)', fontSize: '20px', margin: '0 0 8px' }}>403 Forbidden: Access Denied</h2>
+        <p style={{ color: 'var(--ink-soft)', fontSize: '13px', maxWidth: '480px', margin: '0 auto 16px' }}>
+          Your account (<b>{session?.username || session?.staffId}</b>) is not an authorized 4-member Warden/Admin account. Access to the Warden Dashboard, Reports, and Approvals is strictly denied.
+        </p>
+        <button
+          className="gkof-btn red"
+          onClick={() => { localStorage.clear(); window.location.reload(); }}
+        >
+          Log Out
+        </button>
+      </div>
+    );
+  }
 
   // Filter requests based on status and user role
   const pendingFaculty = requests.filter(r => r.status === 'pending_faculty');

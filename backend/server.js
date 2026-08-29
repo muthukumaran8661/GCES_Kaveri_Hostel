@@ -4,13 +4,19 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
+const { seedWardenAccounts } = require('./config/seedWardens');
 
 // Load env vars from backend/.env or parent env
 dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 
-// Connect to Database
-connectDB();
+// Connect to Database & Seed Fixed Warden Accounts
+connectDB().then(() => {
+  seedWardenAccounts();
+}).catch(() => {
+  // If connectDB is callback based, invoke seedWardenAccounts
+  seedWardenAccounts();
+});
 
 const app = express();
 

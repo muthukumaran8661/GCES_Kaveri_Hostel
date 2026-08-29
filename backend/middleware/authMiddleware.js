@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -23,4 +25,24 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+const protectWardenAllowlist = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
+  }
+
+  if (['staff', 'admin'].includes(req.user.role)) {
+    const uname = (req.user.username || '').trim().toLowerCase();
+    const staffId = (req.user.staffId || '').trim().toLowerCase();
+
+    if (!WARDEN_ALLOWLIST_USERNAMES.includes(uname) && !WARDEN_ALLOWLIST_USERNAMES.includes(staffId)) {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Access Denied. Only pre-authorized 4 Warden/Admin accounts are granted access.'
+      });
+    }
+  }
+
+  next();
+};
+
+module.exports = { protect, protectWardenAllowlist, WARDEN_ALLOWLIST_USERNAMES };

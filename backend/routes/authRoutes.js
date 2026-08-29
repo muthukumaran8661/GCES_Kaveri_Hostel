@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, WARDEN_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key', {
@@ -19,6 +19,13 @@ router.post('/signup', async (req, res) => {
 
     if (!role || !username || !password || !name) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
+    }
+
+    if (role === 'staff' || role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Self-registration of Warden/Admin accounts is disabled. Only pre-authorized accounts can log in.'
+      });
     }
 
     const normalizedUsername = username.trim().toLowerCase();
@@ -117,6 +124,13 @@ router.post('/login', async (req, res) => {
     }
 
     const normalizedUsername = username.trim().toLowerCase();
+
+    if ((role === 'staff' || role === 'admin') && !WARDEN_ALLOWLIST_USERNAMES.includes(normalizedUsername)) {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Access Denied. Your Warden/Admin ID is not an authorized account.'
+      });
+    }
 
     if (role === 'student' && !/^8301[0-9]{8}$/.test(password)) {
       return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
