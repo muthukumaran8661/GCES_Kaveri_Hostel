@@ -297,11 +297,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                               style={{ padding: '4px', fontSize: '12px' }}
                             >
                               <option value="faculty">Faculty Advisor</option>
-                              <option value="staff">Warden / Admin</option>
-                              <option value="admin">Admin</option>
+                              <option value="staff">Warden</option>
                             </select>
                           ) : (
-                            <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{u.role}</span>
+                            <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{u.role === 'staff' ? 'Warden' : u.role === 'faculty' ? 'Faculty Advisor' : u.role}</span>
                           )}
                         </td>
                         <td style={{ padding: '10px' }}>

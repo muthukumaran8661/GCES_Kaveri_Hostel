@@ -101,7 +101,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       onLogin({ role: 'student', username: studentId.trim(), password: regNo.trim() });
     } else {
       if (!staffId.trim() || !staffPass.trim()) {
-        setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Warden / Admin ID and password.');
+        setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Warden ID and password.');
         return;
       }
       onLogin({ role: role, username: staffId.trim(), password: staffPass.trim() });
@@ -138,7 +138,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       });
     } else {
       if (!staffId.trim()) {
-        setError(role === 'faculty' ? 'Faculty ID is required.' : 'Warden / Admin ID is required.');
+        setError(role === 'faculty' ? 'Faculty ID is required.' : 'Warden ID is required.');
         return;
       }
       if (!staffEmail.trim()) {
@@ -227,7 +227,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 setError('');
               }}
             >
-              <span className="emoji">🛡️</span>Warden / Admin
+              <span className="emoji">🛡️</span>Warden
             </div>
           </div>
 
@@ -257,9 +257,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               ) : (
                 <>
                   <div className="gkof-field">
-                    <label>{role === 'faculty' ? 'Faculty ID' : 'Warden / Admin ID'}</label>
+                    <label>{role === 'faculty' ? 'Faculty ID' : 'Warden ID'}</label>
                     <input
-                      placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
+                      placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. Muthu@123'}
                       value={staffId}
                       onChange={(e) => setStaffId(e.target.value)}
                     />
@@ -363,9 +363,9 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 <>
                   <div className="gkof-row">
                     <div className="gkof-field">
-                      <label>{role === 'faculty' ? 'Faculty ID' : 'Warden / Admin ID'}</label>
+                      <label>{role === 'faculty' ? 'Faculty ID' : 'Warden ID'}</label>
                       <input
-                        placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. STF-014'}
+                        placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. Muthu@123'}
                         value={staffId}
                         onChange={(e) => setStaffId(e.target.value)}
                       />

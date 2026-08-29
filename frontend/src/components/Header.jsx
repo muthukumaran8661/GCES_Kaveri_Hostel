@@ -3,7 +3,7 @@ import logo from './../assets/logo.png'
 
 export default function Header({ session, onLogout, subtitle }) {
   const roleLabel = session
-    ? (session.role === 'staff' ? (session.designation || 'Warden / Admin') : `ID ${session.studentId || session.username || ''}`)
+    ? (session.role === 'staff' ? (session.designation || 'Warden') : `ID ${session.studentId || session.username || ''}`)
     : '';
 
   return (
@@ -16,7 +16,7 @@ export default function Header({ session, onLogout, subtitle }) {
           GCES Kaveri Girls Out Form
         </div>
         <div className="font-mono text-[10.5px] tracking-[1.4px] uppercase text-gold-soft mt-[3px] max-[600px]:text-[9px] max-[600px]:tracking-[1px]">
-          {session ? (session.role === 'staff' || session.role === 'admin' ? 'Warden / Admin Dashboard' : session.role === 'faculty' ? 'Faculty Dashboard' : 'Student Dashboard') : subtitle}
+          {session ? (session.role === 'staff' || session.role === 'admin' ? 'Warden Dashboard' : session.role === 'faculty' ? 'Faculty Dashboard' : 'Student Dashboard') : subtitle}
         </div>
       </div>
       {session && (

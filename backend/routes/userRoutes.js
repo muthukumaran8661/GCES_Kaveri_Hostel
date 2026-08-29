@@ -91,7 +91,16 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
       return res.status(404).json({ success: false, message: 'Faculty/Staff user not found.' });
     }
 
-    if (role !== undefined) targetUser.role = role.trim();
+    if (role !== undefined) {
+      const trimmedRole = role.trim();
+      if (!['faculty', 'staff'].includes(trimmedRole)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid role. Permission management allows only "Faculty Advisor" or "Warden".'
+        });
+      }
+      targetUser.role = trimmedRole;
+    }
     if (year !== undefined) targetUser.year = year.trim();
     if (status !== undefined) targetUser.status = status.trim();
     if (designation !== undefined) targetUser.designation = designation.trim();
