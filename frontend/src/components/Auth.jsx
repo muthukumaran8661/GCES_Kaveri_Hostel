@@ -168,7 +168,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         name: staffId.trim(),
         staffId: staffId.trim(),
         designation: designation.trim() || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden'),
-        department: department.trim(),
+        department: role === 'staff' ? 'Hostel Administration' : department.trim(),
         year: year.trim(),
         email: staffEmail.trim(),
         phone: staffPhone.trim()
@@ -200,19 +200,28 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
           <div className="gkof-role-pick">
             <div
               className={`gkof-role-opt ${role === 'student' ? 'active' : ''}`}
-              onClick={() => setRole('student')}
+              onClick={() => {
+                setRole('student');
+                if (department === 'Hostel Administration') setDepartment('CSE');
+              }}
             >
               <span className="emoji">🎓</span>Student
             </div>
             <div
               className={`gkof-role-opt ${role === 'faculty' ? 'active' : ''}`}
-              onClick={() => setRole('faculty')}
+              onClick={() => {
+                setRole('faculty');
+                if (department === 'Hostel Administration') setDepartment('CSE');
+              }}
             >
               <span className="emoji">👨‍🏫</span>Faculty Advisor
             </div>
             <div
               className={`gkof-role-opt ${role === 'staff' ? 'active' : ''}`}
-              onClick={() => setRole('staff')}
+              onClick={() => {
+                setRole('staff');
+                setDepartment('Hostel Administration');
+              }}
             >
               <span className="emoji">🛡️</span>Warden / Admin
             </div>
@@ -369,15 +378,20 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   <div className="gkof-row">
                     <div className="gkof-field">
                       <label>Department</label>
-                      <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="EEE">EEE</option>
-                        <option value="Mechanical">Mechanical</option>
-                        <option value="Civil">Civil</option>
-                        <option value="Mechatronics">Mechatronics</option>
-                        <option value="Hostel Administration">Hostel Administration</option>
-                      </select>
+                      {role === 'staff' ? (
+                        <select value="Hostel Administration" disabled style={{ backgroundColor: '#F1F3F4', cursor: 'not-allowed', color: '#2A2140', fontWeight: 600 }}>
+                          <option value="Hostel Administration">Hostel Administration</option>
+                        </select>
+                      ) : (
+                        <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+                          <option value="CSE">CSE</option>
+                          <option value="ECE">ECE</option>
+                          <option value="EEE">EEE</option>
+                          <option value="Mechanical">Mechanical</option>
+                          <option value="Civil">Civil</option>
+                          <option value="Mechatronics">Mechatronics</option>
+                        </select>
+                      )}
                     </div>
                     <div className="gkof-field">
                       <label>{role === 'faculty' ? 'Assigned Year' : 'Academic Year'}</label>

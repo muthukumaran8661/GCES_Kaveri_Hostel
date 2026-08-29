@@ -91,11 +91,16 @@ router.put('/:id/admin-update', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Faculty/Staff user not found.' });
     }
 
-    if (department !== undefined) targetUser.department = department.trim();
-    if (year !== undefined) targetUser.year = year.trim();
     if (role !== undefined) targetUser.role = role.trim();
+    if (year !== undefined) targetUser.year = year.trim();
     if (status !== undefined) targetUser.status = status.trim();
     if (designation !== undefined) targetUser.designation = designation.trim();
+
+    if (['staff', 'admin'].includes(targetUser.role)) {
+      targetUser.department = 'Hostel Administration';
+    } else if (department !== undefined) {
+      targetUser.department = department.trim();
+    }
 
     await targetUser.save();
 

@@ -262,7 +262,18 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                         </td>
                         <td style={{ padding: '10px' }}>
                           {isEditing ? (
-                            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
+                            <select
+                              value={editForm.role}
+                              onChange={e => {
+                                const r = e.target.value;
+                                setEditForm({
+                                  ...editForm,
+                                  role: r,
+                                  department: (r === 'staff' || r === 'admin') ? 'Hostel Administration' : (editForm.department === 'Hostel Administration' ? 'CSE' : editForm.department)
+                                });
+                              }}
+                              style={{ padding: '4px', fontSize: '12px' }}
+                            >
                               <option value="faculty">Faculty Advisor</option>
                               <option value="staff">Warden / Admin</option>
                               <option value="admin">Admin</option>
@@ -273,15 +284,20 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                         </td>
                         <td style={{ padding: '10px' }}>
                           {isEditing ? (
-                            <select value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
-                              <option value="CSE">CSE</option>
-                              <option value="ECE">ECE</option>
-                              <option value="EEE">EEE</option>
-                              <option value="Mechanical">Mechanical</option>
-                              <option value="Civil">Civil</option>
-                              <option value="Mechatronics">Mechatronics</option>
-                              <option value="Hostel Administration">Hostel Administration</option>
-                            </select>
+                            (editForm.role === 'staff' || editForm.role === 'admin') ? (
+                              <select value="Hostel Administration" disabled style={{ padding: '4px', fontSize: '12px', backgroundColor: '#F1F3F4', cursor: 'not-allowed' }}>
+                                <option value="Hostel Administration">Hostel Administration</option>
+                              </select>
+                            ) : (
+                              <select value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
+                                <option value="CSE">CSE</option>
+                                <option value="ECE">ECE</option>
+                                <option value="EEE">EEE</option>
+                                <option value="Mechanical">Mechanical</option>
+                                <option value="Civil">Civil</option>
+                                <option value="Mechatronics">Mechatronics</option>
+                              </select>
+                            )
                           ) : (
                             u.department || '—'
                           )}

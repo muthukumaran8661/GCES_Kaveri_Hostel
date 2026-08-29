@@ -34,7 +34,9 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Additional validations
+    let finalDepartment = (department || '').trim();
+
+    // Additional validations & department enforcement
     if (role === 'student') {
       if (!/^8301[0-9]{8}$/.test(reg)) {
         return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
@@ -42,7 +44,15 @@ router.post('/signup', async (req, res) => {
       if (!/^[0-9]+$/.test(room)) {
         return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
       }
-    } else if (role === 'staff' || role === 'faculty') {
+    } else if (role === 'staff' || role === 'admin') {
+      if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
+        return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
+      }
+      if (finalDepartment && finalDepartment.toLowerCase() !== 'hostel administration') {
+        return res.status(400).json({ success: false, message: 'Invalid department for Warden / Admin. Department must be "Hostel Administration".' });
+      }
+      finalDepartment = 'Hostel Administration';
+    } else if (role === 'faculty') {
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
       }
@@ -58,7 +68,7 @@ router.post('/signup', async (req, res) => {
       studentId: studentId || normalizedUsername,
       staffId: staffId || normalizedUsername,
       designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden / Admin'),
-      department: department || '',
+      department: finalDepartment,
       year: year || '',
       status: 'active',
       email: email || '',
