@@ -104,6 +104,48 @@ const OutRequestSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  qrToken: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  qrStatus: {
+    type: String,
+    enum: ['ACTIVE', 'OUT', 'RETURNED', 'INVALID'],
+    default: 'ACTIVE'
+  },
+  scanCount: {
+    type: Number,
+    default: 0
+  },
+  actualOutTime: {
+    type: Date,
+    default: null
+  },
+  actualOutScannedBy: {
+    type: String,
+    default: ''
+  },
+  actualReturnTime: {
+    type: Date,
+    default: null
+  },
+  actualReturnScannedBy: {
+    type: String,
+    default: ''
+  },
+  lateReturn: {
+    type: Boolean,
+    default: false
+  },
+  lateReturnDuration: {
+    type: String,
+    default: ''
+  },
+  invalidScanAttemptsCount: {
+    type: Number,
+    default: 0
+  },
   gpsLocations: [{
     lat: { type: Number, required: true },
     lng: { type: Number, required: true },

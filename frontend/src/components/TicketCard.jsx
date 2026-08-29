@@ -47,7 +47,7 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function TicketCard({ request: r, viewer, onAction, onShareLocation }) {
+export default function TicketCard({ request: r, viewer, onAction, onShareLocation, onViewQr }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
   const type = r.type === 'weekday' ? 'weekday' : 'weekend';
   const typeLabel = type === 'weekday' ? 'Weekday Out Pass' : 'Weekend Out Pass';
@@ -390,8 +390,17 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
         )}
 
         {isDownloadable && (
-          <div className="gkof-btn-row">
+          <div className="gkof-btn-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
             <button className="gkof-btn gold" onClick={downloadOutPass}>⬇️ Download Out Pass (PDF)</button>
+            {onViewQr && (
+              <button
+                className="gkof-btn teal"
+                style={{ background: '#0D9488', color: '#fff', fontWeight: 'bold' }}
+                onClick={() => onViewQr(r)}
+              >
+                📱 View Gate Pass QR
+              </button>
+            )}
           </div>
         )}
         {r.status === 'notifying_parent' && (

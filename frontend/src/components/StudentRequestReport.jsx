@@ -142,6 +142,10 @@ export function exportRequestsToExcel(records) {
     const history = getApprovalHistory(r);
     const reqDate = r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : '—';
     const parentMobileVal = r.parentPhone || r.parentMobile || '—';
+    const actualOut = r.actualOutTime ? new Date(r.actualOutTime).toLocaleString('en-IN') : '—';
+    const actualRet = r.actualReturnTime ? new Date(r.actualReturnTime).toLocaleString('en-IN') : '—';
+    const lateVal = r.lateReturn ? `YES (${r.lateReturnDuration || 'Late'})` : 'NO';
+
     return {
       '#': index + 1,
       'Student Name': r.name || '—',
@@ -153,6 +157,12 @@ export function exportRequestsToExcel(records) {
       'Destination / Home Address': r.dest || '—',
       'Out Date & Time': r.fromDate || '—',
       'Expected Return': r.toDate || '—',
+      'Actual Out Time': actualOut,
+      'Actual Return Time': actualRet,
+      'Late Return': lateVal,
+      'QR Status': r.qrStatus || 'ACTIVE',
+      'Successful Scans': `${r.scanCount || 0}/2`,
+      'Invalid Scan Attempts': r.invalidScanAttemptsCount || 0,
       'Request Date': reqDate,
       'Request ID': r.requestId || r.id || '—',
       'Faculty Advisor Status': history.facultyStatus,
@@ -175,6 +185,12 @@ export function exportRequestsToExcel(records) {
     { wch: 32 },  // Destination / Home Address
     { wch: 20 },  // Out Date & Time
     { wch: 20 },  // Expected Return
+    { wch: 22 },  // Actual Out Time
+    { wch: 22 },  // Actual Return Time
+    { wch: 16 },  // Late Return
+    { wch: 14 },  // QR Status
+    { wch: 16 },  // Successful Scans
+    { wch: 20 },  // Invalid Scan Attempts
     { wch: 22 },  // Request Date
     { wch: 14 },  // Request ID
     { wch: 24 },  // Faculty Advisor Status
@@ -211,6 +227,33 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('detailed');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditResultFilter, setAuditResultFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab, auditResultFilter, searchQuery]);
+
+  async function fetchAuditLogs() {
+    try {
+      setAuditLoading(true);
+      const token = localStorage.getItem('gkof_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/qr/audit-logs?scanResult=${auditResultFilter}&searchQuery=${encodeURIComponent(searchQuery)}`, { headers });
+      const data = await res.json();
+      if (data && data.logs) {
+        setAuditLogs(data.logs);
+      }
+    } catch (e) {
+      console.error('Fetch audit logs error:', e);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
 
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
@@ -683,6 +726,12 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
             >
               <span>👥</span> Student Summary ({studentWiseStats.length})
             </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`py-2 sm:py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] sm:text-xs whitespace-nowrap ${activeTab === 'audit' ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold' : 'border-transparent text-gray-500'}`}
+            >
+              <span>🔍</span> QR Scan Audit Log ({auditLogs.length})
+            </button>
           </div>
 
           {/* Main Content Area */}
@@ -708,6 +757,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                         <th className="p-2.5">Destination / Address</th>
                         <th className="p-2.5">Out Time</th>
                         <th className="p-2.5">Expected Return</th>
+                        <th className="p-2.5">QR Status</th>
+                        <th className="p-2.5">Scans</th>
                         <th className="p-2.5">Request ID</th>
                         <th className="p-2.5">Faculty Status</th>
                         <th className="p-2.5">Warden Status</th>
@@ -732,6 +783,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                             <td className="p-2.5 text-gray-700 max-w-[180px] truncate" title={r.dest}>{r.dest || '—'}</td>
                             <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
                             <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
+                            <td className="p-2.5 font-semibold text-indigo-900">{r.qrStatus || 'ACTIVE'}</td>
+                            <td className="p-2.5 font-bold text-gray-700">{r.scanCount || 0}/2</td>
                             <td className="p-2.5 font-mono text-xs font-semibold text-indigo-700">{r.requestId || r.id || '—'}</td>
                             <td className="p-2.5 text-gray-700 font-medium">{history.facultyStatus}</td>
                             <td className="p-2.5 text-gray-700 font-medium">{history.wardenStatus}</td>
@@ -753,7 +806,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                   </table>
                 </div>
               )
-            ) : (
+            ) : activeTab === 'summary' ? (
               /* Tab 2: Student-Wise Aggregated Statistics Table */
               studentWiseStats.length === 0 ? (
                 <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
@@ -796,6 +849,91 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                   </table>
                 </div>
               )
+            ) : (
+              /* Tab 3: QR Scan Audit Log Table */
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-100 rounded-xl text-xs">
+                  <div className="flex items-center gap-2">
+                    <label className="font-semibold text-gray-700">Filter Result:</label>
+                    <select
+                      value={auditResultFilter}
+                      onChange={e => setAuditResultFilter(e.target.value)}
+                      className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg font-medium outline-none"
+                    >
+                      <option value="ALL">All Results</option>
+                      <option value="VALID_OUT">VALID OUT</option>
+                      <option value="VALID_BACK">VALID BACK</option>
+                      <option value="INVALID_ALREADY_USED">INVALID ALREADY USED</option>
+                      <option value="INVALID_TOKEN">INVALID TOKEN</option>
+                      <option value="INVALID_STATUS">INVALID STATUS</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={fetchAuditLogs}
+                    className="px-3 py-1 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    🔄 Refresh Audit Logs
+                  </button>
+                </div>
+
+                {auditLoading ? (
+                  <div className="py-12 text-center text-gray-500">Loading QR Scan Audit Logs…</div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    <span className="text-3xl block mb-2">🔍</span>
+                    <p className="font-semibold text-sm">No QR scan audit log entries recorded yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm max-w-full">
+                    <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
+                      <thead>
+                        <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
+                          <th className="p-2.5">#</th>
+                          <th className="p-2.5">Scan Timestamp</th>
+                          <th className="p-2.5">Scan Result</th>
+                          <th className="p-2.5">Action Attempted</th>
+                          <th className="p-2.5">Student Name &amp; Reg</th>
+                          <th className="p-2.5">Scanned By (Role)</th>
+                          <th className="p-2.5">Request ID</th>
+                          <th className="p-2.5">Prev Status</th>
+                          <th className="p-2.5">Details / Failure Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {auditLogs.map((log, i) => {
+                          const isSuccess = log.scanResult === 'VALID_OUT' || log.scanResult === 'VALID_BACK';
+                          return (
+                            <tr key={log._id || i} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-2.5 font-semibold text-gray-400">{i + 1}</td>
+                              <td className="p-2.5 font-mono text-gray-600 whitespace-nowrap">
+                                {new Date(log.scanTimestamp).toLocaleString('en-IN')}
+                              </td>
+                              <td className="p-2.5">
+                                <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded-md border ${isSuccess ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'}`}>
+                                  {log.scanResult}
+                                </span>
+                              </td>
+                              <td className="p-2.5 font-bold text-gray-800">{log.actionAttempted || 'VERIFY'}</td>
+                              <td className="p-2.5">
+                                <b className="text-gray-900 block">{log.studentName || '—'}</b>
+                                <span className="font-mono text-gray-500 text-[11px]">{log.regNumber || log.studentId || '—'}</span>
+                              </td>
+                              <td className="p-2.5 font-medium text-gray-700">
+                                {log.scannedBy || 'Gate Staff'} <span className="text-gray-400 font-mono text-[10px]">({log.scannerRole || 'staff'})</span>
+                              </td>
+                              <td className="p-2.5 font-mono text-indigo-700 font-semibold">{log.requestId || '—'}</td>
+                              <td className="p-2.5 font-semibold text-gray-600">{log.previousQrStatus || 'NONE'}</td>
+                              <td className="p-2.5 text-rose-700 text-[11px] max-w-[200px] truncate" title={log.failureReason || ''}>
+                                {log.failureReason || '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

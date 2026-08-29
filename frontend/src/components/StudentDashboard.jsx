@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import TicketCard from './TicketCard';
+import StudentQrModal from './StudentQrModal';
 
 function TimePicker12Hour({
   label,
@@ -75,6 +76,7 @@ function TimePicker12Hour({
 }
 
 export default function StudentDashboard({ session, requests, onSubmitRequest, onAction, onSaveProfileAddress, onShareLocation }) {
+  const [qrModalRequest, setQrModalRequest] = useState(null);
   const mine = requests.slice().reverse();
   const total = mine.length;
   const pending = mine.filter(r => ['pending_staff', 'notifying_parent', 'pending_faculty'].includes(r.status)).length;
@@ -428,6 +430,7 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
                 viewer="student"
                 onAction={onAction}
                 onShareLocation={onShareLocation}
+                onViewQr={setQrModalRequest}
               />
             ))
           ) : (
@@ -435,6 +438,13 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
           )}
         </div>
       </div>
+
+      {qrModalRequest && (
+        <StudentQrModal
+          request={qrModalRequest}
+          onClose={() => setQrModalRequest(null)}
+        />
+      )}
     </>
   );
 }

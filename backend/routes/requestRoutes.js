@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const OutRequest = require('../models/OutRequest');
 const User = require('../models/User');
 const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
@@ -130,11 +131,24 @@ router.post('/', protect, async (req, res) => {
 router.get('/student', protect, async (req, res) => {
   try {
     const requests = await OutRequest.find({ owner: req.user.username }).sort({ createdAt: -1 }).lean();
-    const enriched = requests.map(r => ({
-      ...r,
-      department: req.user.department || r.department || '',
-      year: req.user.year || r.year || '',
-      studentPhone: req.user.phone || r.studentPhone || ''
+    const enriched = await Promise.all(requests.map(async r => {
+      let token = r.qrToken;
+      let status = r.qrStatus || 'ACTIVE';
+
+      if (['approved_final', 'returned'].includes(r.status) && !token) {
+        token = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+        status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
+        await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
+      }
+
+      return {
+        ...r,
+        qrToken: token || r.qrToken,
+        qrStatus: status,
+        department: req.user.department || r.department || '',
+        year: req.user.year || r.year || '',
+        studentPhone: req.user.phone || r.studentPhone || ''
+      };
     }));
     return res.json({ success: true, requests: enriched });
   } catch (error) {
@@ -188,15 +202,26 @@ router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
       if (u.reg) userMap.set(u.reg.toLowerCase(), u);
     });
 
-    const enrichedRequests = allRequests.map(r => {
+    const enrichedRequests = await Promise.all(allRequests.map(async r => {
       const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
+      let token = r.qrToken;
+      let status = r.qrStatus || 'ACTIVE';
+
+      if (['approved_final', 'returned'].includes(r.status) && !token) {
+        token = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+        status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
+        await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
+      }
+
       return {
         ...r,
+        qrToken: token || r.qrToken,
+        qrStatus: status,
         department: u?.department || r.department || '',
         year: u?.year || r.year || '',
         studentPhone: u?.phone || r.studentPhone || ''
       };
-    });
+    }));
 
     // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
     if (req.user.role === 'faculty') {
@@ -335,7 +360,11 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
         break;
       case 'parent_approved':
         request.status = 'approved_final';
-        request.log.push('Parent confirmed by call/OTP — student marked OUT');
+        if (!request.qrToken) {
+          request.qrToken = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+          request.qrStatus = 'ACTIVE';
+        }
+        request.log.push('Parent confirmed by call/OTP — Out Pass APPROVED and QR code generated');
         break;
       case 'parent_rejected':
         request.status = 'parent_rejected';
