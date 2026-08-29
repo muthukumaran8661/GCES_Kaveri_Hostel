@@ -94,6 +94,64 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [editingUserId, setEditingUserId] = useState(null);
   const [editForm, setEditForm] = useState({ department: '', year: '', role: '', status: '' });
 
+  const WARDEN_ORDER_LIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+  const DEPT_ORDER_MAP = {
+    'cse': 1,
+    'ece': 2,
+    'eee': 3,
+    'mechanical': 4,
+    'mech': 4,
+    'civil': 5,
+    'mechatronics': 6
+  };
+
+  function getWardenRank(u) {
+    const uname = (u.username || u.staffId || '').toLowerCase();
+    const name = (u.name || '').toLowerCase();
+    if (uname.includes('muthu') || name.includes('muthukumaran')) return 1;
+    if (uname.includes('rajesh') || name.includes('rajesh')) return 2;
+    if (uname.includes('deva') || name.includes('deva')) return 3;
+    if (uname.includes('prince') || name.includes('prince')) return 4;
+    return 99;
+  }
+
+  function getYearRank(y) {
+    if (!y) return 99;
+    const s = String(y).trim();
+    if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 1;
+    if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 2;
+    if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 3;
+    if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 4;
+    return 99;
+  }
+
+  function sortStaffUsers(users) {
+    if (!Array.isArray(users)) return [];
+    return [...users].sort((a, b) => {
+      const unameA = (a.username || a.staffId || '').toLowerCase();
+      const unameB = (b.username || b.staffId || '').toLowerCase();
+      const isWardenA = a.role === 'staff' || a.role === 'admin' || (a.department || '').toLowerCase() === 'hostel administration' || WARDEN_ORDER_LIST.includes(unameA);
+      const isWardenB = b.role === 'staff' || b.role === 'admin' || (b.department || '').toLowerCase() === 'hostel administration' || WARDEN_ORDER_LIST.includes(unameB);
+
+      if (isWardenA && !isWardenB) return -1;
+      if (!isWardenA && isWardenB) return 1;
+
+      if (isWardenA && isWardenB) {
+        return getWardenRank(a) - getWardenRank(b);
+      }
+
+      const deptA = DEPT_ORDER_MAP[(a.department || '').toLowerCase()] || 99;
+      const deptB = DEPT_ORDER_MAP[(b.department || '').toLowerCase()] || 99;
+      if (deptA !== deptB) return deptA - deptB;
+
+      const yearA = getYearRank(a.year);
+      const yearB = getYearRank(b.year);
+      if (yearA !== yearB) return yearA - yearB;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }
+
   useEffect(() => {
     if (isAdminOrWarden) {
       loadStaffList();
@@ -104,7 +162,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     try {
       setLoadingStaff(true);
       const res = await apiFetch('/api/users/staff-list');
-      setStaffUsers(res.users || []);
+      setStaffUsers(sortStaffUsers(res.users || []));
     } catch (err) {
       console.error('Error loading staff list:', err);
     } finally {
@@ -283,7 +341,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                   </tr>
                 </thead>
                 <tbody>
-                  {staffUsers.map(u => {
+                  {sortStaffUsers(staffUsers).map(u => {
                     const isEditing = editingUserId === (u._id || u.id);
                     return (
                       <tr key={u._id || u.id} style={{ borderBottom: '1px solid var(--line)' }}>

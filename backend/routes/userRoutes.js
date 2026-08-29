@@ -55,6 +55,69 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
+const WARDEN_USERNAMES = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+
+const DEPT_ORDER = {
+  'cse': 1,
+  'ece': 2,
+  'eee': 3,
+  'mechanical': 4,
+  'mech': 4,
+  'civil': 5,
+  'mechatronics': 6
+};
+
+function getWardenRank(u) {
+  const uname = (u.username || u.staffId || '').toLowerCase();
+  const name = (u.name || '').toLowerCase();
+  if (uname.includes('muthu') || name.includes('muthukumaran')) return 1;
+  if (uname.includes('rajesh') || name.includes('rajesh')) return 2;
+  if (uname.includes('deva') || name.includes('deva')) return 3;
+  if (uname.includes('prince') || name.includes('prince')) return 4;
+  return 99;
+}
+
+function getYearRank(y) {
+  if (!y) return 99;
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 1;
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 2;
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 3;
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 4;
+  return 99;
+}
+
+function sortStaffUsers(users) {
+  if (!Array.isArray(users)) return [];
+  return [...users].sort((a, b) => {
+    const unameA = (a.username || a.staffId || '').toLowerCase();
+    const unameB = (b.username || b.staffId || '').toLowerCase();
+    const isWardenA = a.role === 'staff' || a.role === 'admin' || (a.department || '').toLowerCase() === 'hostel administration' || WARDEN_USERNAMES.includes(unameA);
+    const isWardenB = b.role === 'staff' || b.role === 'admin' || (b.department || '').toLowerCase() === 'hostel administration' || WARDEN_USERNAMES.includes(unameB);
+
+    // Rule 1: Wardens MUST display first
+    if (isWardenA && !isWardenB) return -1;
+    if (!isWardenA && isWardenB) return 1;
+
+    // If both are Wardens, sort in fixed order: Muthukumaran G -> Rajesh P -> Deva N -> Prince P
+    if (isWardenA && isWardenB) {
+      return getWardenRank(a) - getWardenRank(b);
+    }
+
+    // Rule 2: Faculty Advisors - sort by Department (CSE -> ECE -> EEE -> Mechanical -> Civil -> Mechatronics)
+    const deptA = DEPT_ORDER[(a.department || '').toLowerCase()] || 99;
+    const deptB = DEPT_ORDER[(b.department || '').toLowerCase()] || 99;
+    if (deptA !== deptB) return deptA - deptB;
+
+    // Rule 3: Within same Department, sort by Year (I Year -> II Year -> III Year -> IV Year)
+    const yearA = getYearRank(a.year);
+    const yearB = getYearRank(b.year);
+    if (yearA !== yearB) return yearA - yearB;
+
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
+
 // @route   GET /api/users/staff-list
 // @desc    Get list of all faculty and staff users for Admin management
 // @access  Private (Staff/Faculty/Admin)
@@ -64,9 +127,10 @@ router.get('/staff-list', protect, protectWardenAllowlist, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied.' });
     }
 
-    const users = await User.find({ role: { $in: ['faculty', 'staff', 'admin'] } })
-      .select('-password')
-      .sort({ name: 1 });
+    const rawUsers = await User.find({ role: { $in: ['faculty', 'staff', 'admin'] } })
+      .select('-password');
+
+    const users = sortStaffUsers(rawUsers);
 
     return res.json({ success: true, users });
   } catch (error) {
