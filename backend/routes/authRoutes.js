@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { protect, WARDEN_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
+const { protect, WARDEN_ALLOWLIST_USERNAMES, FACULTY_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key', {
@@ -11,7 +11,7 @@ const generateToken = (id) => {
 };
 
 // @route   POST /api/auth/signup
-// @desc    Register a new student or staff user
+// @desc    Register a new student user
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
@@ -21,10 +21,10 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
     }
 
-    if (role === 'staff' || role === 'admin') {
+    if (role === 'staff' || role === 'admin' || role === 'faculty') {
       return res.status(403).json({
         success: false,
-        message: '403 Forbidden: Self-registration of Warden/Admin accounts is disabled. Only pre-authorized accounts can log in.'
+        message: '403 Forbidden: Self-registration of Warden and Faculty Advisor accounts is disabled. Only pre-authorized accounts can log in.'
       });
     }
 
@@ -131,7 +131,14 @@ router.post('/login', async (req, res) => {
     if ((role === 'staff' || role === 'admin') && !WARDEN_ALLOWLIST_USERNAMES.includes(normalizedUsername)) {
       return res.status(403).json({
         success: false,
-        message: '403 Forbidden: Access Denied. Your Warden/Admin ID is not an authorized account.'
+        message: '403 Forbidden: Access Denied. Your Warden ID is not an authorized account.'
+      });
+    }
+
+    if (role === 'faculty' && !FACULTY_ALLOWLIST_USERNAMES.includes(normalizedUsername)) {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Access Denied. Your Faculty ID is not an authorized Faculty Advisor account.'
       });
     }
 

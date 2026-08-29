@@ -37,19 +37,28 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
   const WARDEN_ALLOWLIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+  const FACULTY_ALLOWLIST = [
+    'arunkumar@123', 'balakumar@123', 'dineshkumar@123', 'karthikraj@123',
+    'anandkumar@123', 'ganeshraj@123', 'harikumar@123', 'manojkumar@123',
+    'prakashraj@123', 'ravikumar@123', 'sureshbabu@123', 'vigneshkumar@123',
+    'ajaykumar@123', 'bharathraj@123', 'naveenkumar@123', 'santhoshkumar@123',
+    'ashokkumar@123', 'deepakraj@123', 'mohankumar@123', 'praveenkumar@123',
+    'gokulraj@123', 'lokeshkumar@123', 'sanjaykumar@123', 'vijayraj@123'
+  ];
   const userUname = (session?.username || session?.staffId || '').trim().toLowerCase();
   const isAuthorizedWarden = !isAdminOrWarden || WARDEN_ALLOWLIST.includes(userUname);
+  const isAuthorizedFaculty = !isFaculty || FACULTY_ALLOWLIST.includes(userUname);
 
   const facYearDisplay = normalizeYear(session?.year);
   const [showReportModal, setShowReportModal] = useState(false);
 
-  if (isAdminOrWarden && !isAuthorizedWarden) {
+  if ((isAdminOrWarden && !isAuthorizedWarden) || (isFaculty && !isAuthorizedFaculty)) {
     return (
       <div className="gkof-card" style={{ textAlign: 'center', padding: '40px 20px', borderLeft: '4px solid var(--red)' }}>
         <span style={{ fontSize: '48px', display: 'block', marginBottom: '12px' }}>🛑</span>
         <h2 style={{ color: 'var(--red)', fontSize: '20px', margin: '0 0 8px' }}>403 Forbidden: Access Denied</h2>
         <p style={{ color: 'var(--ink-soft)', fontSize: '13px', maxWidth: '480px', margin: '0 auto 16px' }}>
-          Your account (<b>{session?.username || session?.staffId}</b>) is not an authorized 4-member Warden/Admin account. Access to the Warden Dashboard, Reports, and Approvals is strictly denied.
+          Your account (<b>{session?.username || session?.staffId}</b>) is not an authorized predefined {isFaculty ? '24 Faculty Advisor' : '4 Warden'} account. Access to the dashboard, reports, and approvals is strictly denied.
         </p>
         <button
           className="gkof-btn red"

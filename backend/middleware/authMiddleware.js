@@ -3,6 +3,15 @@ const User = require('../models/User');
 
 const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
 
+const FACULTY_ALLOWLIST_USERNAMES = [
+  'arunkumar@123', 'balakumar@123', 'dineshkumar@123', 'karthikraj@123',
+  'anandkumar@123', 'ganeshraj@123', 'harikumar@123', 'manojkumar@123',
+  'prakashraj@123', 'ravikumar@123', 'sureshbabu@123', 'vigneshkumar@123',
+  'ajaykumar@123', 'bharathraj@123', 'naveenkumar@123', 'santhoshkumar@123',
+  'ashokkumar@123', 'deepakraj@123', 'mohankumar@123', 'praveenkumar@123',
+  'gokulraj@123', 'lokeshkumar@123', 'sanjaykumar@123', 'vijayraj@123'
+];
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -37,7 +46,7 @@ const protectWardenAllowlist = (req, res, next) => {
     if (!WARDEN_ALLOWLIST_USERNAMES.includes(uname) && !WARDEN_ALLOWLIST_USERNAMES.includes(staffId)) {
       return res.status(403).json({
         success: false,
-        message: '403 Forbidden: Access Denied. Only pre-authorized 4 Warden/Admin accounts are granted access.'
+        message: '403 Forbidden: Access Denied. Only pre-authorized 4 Warden accounts are granted access.'
       });
     }
   }
@@ -45,4 +54,30 @@ const protectWardenAllowlist = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, protectWardenAllowlist, WARDEN_ALLOWLIST_USERNAMES };
+const protectFacultyAllowlist = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
+  }
+
+  if (req.user.role === 'faculty') {
+    const uname = (req.user.username || '').trim().toLowerCase();
+    const staffId = (req.user.staffId || '').trim().toLowerCase();
+
+    if (!FACULTY_ALLOWLIST_USERNAMES.includes(uname) && !FACULTY_ALLOWLIST_USERNAMES.includes(staffId)) {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Access Denied. Only pre-authorized 24 Faculty Advisor accounts are granted access.'
+      });
+    }
+  }
+
+  next();
+};
+
+module.exports = {
+  protect,
+  protectWardenAllowlist,
+  protectFacultyAllowlist,
+  WARDEN_ALLOWLIST_USERNAMES,
+  FACULTY_ALLOWLIST_USERNAMES
+};

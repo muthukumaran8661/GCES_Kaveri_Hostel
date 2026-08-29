@@ -191,7 +191,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
           >
             Login
           </div>
-          {role !== 'staff' && (
+          {role === 'student' && (
             <div
               className={`gkof-auth-tab ${authMode === 'signup' ? 'active' : ''}`}
               onClick={() => { setAuthMode('signup'); setError(''); }}
@@ -219,6 +219,8 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               onClick={() => {
                 setRole('faculty');
                 if (department === 'Hostel Administration') setDepartment('CSE');
+                setAuthMode('login');
+                setError('');
               }}
             >
               <span className="emoji">👨‍🏫</span>Faculty Advisor

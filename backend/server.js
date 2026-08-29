@@ -5,17 +5,19 @@ const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
 const { seedWardenAccounts } = require('./config/seedWardens');
+const { seedFacultyAccounts } = require('./config/seedFaculty');
 
 // Load env vars from backend/.env or parent env
 dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 
-// Connect to Database & Seed Fixed Warden Accounts
+// Connect to Database & Seed Fixed Warden + Faculty Accounts
 connectDB().then(() => {
   seedWardenAccounts();
+  seedFacultyAccounts();
 }).catch(() => {
-  // If connectDB is callback based, invoke seedWardenAccounts
   seedWardenAccounts();
+  seedFacultyAccounts();
 });
 
 const app = express();
