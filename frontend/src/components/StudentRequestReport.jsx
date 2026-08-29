@@ -141,18 +141,18 @@ export function exportRequestsToExcel(records) {
   const exportData = records.map((r, index) => {
     const history = getApprovalHistory(r);
     const reqDate = r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : '—';
+    const parentMobileVal = r.parentPhone || r.parentMobile || '—';
     return {
       '#': index + 1,
       'Student Name': r.name || '—',
       'Register Number': r.reg || r.studentId || '—',
-      'Student Phone Number': r.studentPhone || r.phone || '—',
+      'PARENT MOBILE': parentMobileVal,
       'Department': r.department || '—',
       'Year': normalizeYear(r.year),
       'Hostel / Room No.': r.room || '—',
       'Destination / Home Address': r.dest || '—',
       'Out Date & Time': r.fromDate || '—',
       'Expected Return': r.toDate || '—',
-      'Parent Mobile Number': r.parentPhone || '—',
       'Request Date': reqDate,
       'Request ID': r.requestId || r.id || '—',
       'Faculty Advisor Status': history.facultyStatus,
@@ -168,14 +168,13 @@ export function exportRequestsToExcel(records) {
     { wch: 6 },   // #
     { wch: 22 },  // Student Name
     { wch: 18 },  // Register Number
-    { wch: 18 },  // Student Phone Number
+    { wch: 18 },  // PARENT MOBILE
     { wch: 16 },  // Department
     { wch: 12 },  // Year
     { wch: 18 },  // Hostel / Room No.
     { wch: 32 },  // Destination / Home Address
     { wch: 20 },  // Out Date & Time
     { wch: 20 },  // Expected Return
-    { wch: 20 },  // Parent Mobile Number
     { wch: 22 },  // Request Date
     { wch: 14 },  // Request ID
     { wch: 24 },  // Faculty Advisor Status
@@ -187,7 +186,7 @@ export function exportRequestsToExcel(records) {
   worksheet['!views'] = [{ state: 'frozen', xSplit: 0, ySplit: 1, activePane: 'bottomLeft', topLeftCell: 'A2' }];
 
   if (exportData.length > 0) {
-    worksheet['!autofilter'] = { ref: `A1:Q${exportData.length + 1}` };
+    worksheet['!autofilter'] = { ref: `A1:P${exportData.length + 1}` };
   }
 
   const workbook = XLSX.utils.book_new();
@@ -265,7 +264,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         const regMatch = (r.reg || r.studentId || '').toLowerCase().includes(q);
         const idMatch = (r.requestId || r.id || '').toLowerCase().includes(q);
         const destMatch = (r.dest || '').toLowerCase().includes(q);
-        if (!nameMatch && !regMatch && !idMatch && !destMatch) return false;
+        const parentPhoneMatch = (r.parentPhone || r.parentMobile || '').toLowerCase().includes(q);
+        if (!nameMatch && !regMatch && !idMatch && !destMatch && !parentPhoneMatch) return false;
       }
 
       return true;
@@ -290,7 +290,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         map.set(regKey, {
           name: r.name || 'N/A',
           reg: r.reg || r.studentId || '—',
-          phone: r.studentPhone || r.phone || '—',
+          phone: r.parentPhone || r.parentMobile || '—',
           department: r.department || '—',
           year: normalizeYear(r.year),
           total: 0,
@@ -300,8 +300,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         });
       }
       const item = map.get(regKey);
-      if (item.phone === '—' && (r.studentPhone || r.phone)) {
-        item.phone = r.studentPhone || r.phone;
+      if (item.phone === '—' && (r.parentPhone || r.parentMobile)) {
+        item.phone = r.parentPhone || r.parentMobile;
       }
       item.total += 1;
       const cat = getStatusCategory(r.status);
@@ -420,8 +420,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       const logHeaders = [
         { name: '#', width: 20 },
         { name: 'Student Name & Reg No.', width: 95 },
-        { name: 'Phone Number', width: 65 },
-        { name: 'Dept / Year', width: 65 },
+        { name: 'PARENT MOBILE', width: 70 },
+        { name: 'Dept / Year', width: 60 },
         { name: 'Out Time', width: 75 },
         { name: 'Return Time', width: 75 },
         { name: 'Destination', width: 75 },
@@ -452,7 +452,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
       } else {
         filteredRequests.forEach((r, idx) => {
           const nameReg = `${r.name || 'N/A'}\nReg: ${r.reg || '—'}`;
-          const phoneStr = r.studentPhone || r.phone || '—';
+          const phoneStr = r.parentPhone || r.parentMobile || '—';
           const deptYr = `${r.department || '—'}\n${normalizeYear(r.year)}`;
           const outTime = r.fromDate || '—';
           const retTime = r.toDate || '—';
@@ -696,7 +696,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
               <label className="font-semibold text-gray-700">Search:</label>
               <input
                 type="text"
-                placeholder="Search Name, Reg No, Request ID..."
+                placeholder="Search Name, Reg No, Parent Mobile, Request ID..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
@@ -772,14 +772,13 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                       <th className="p-2.5">#</th>
                       <th className="p-2.5">Student Name</th>
                       <th className="p-2.5">Register No.</th>
-                      <th className="p-2.5">Student Phone</th>
+                      <th className="p-2.5">PARENT MOBILE</th>
                       <th className="p-2.5">Dept</th>
                       <th className="p-2.5">Year</th>
                       <th className="p-2.5">Room</th>
                       <th className="p-2.5">Destination / Address</th>
                       <th className="p-2.5">Out Time</th>
                       <th className="p-2.5">Expected Return</th>
-                      <th className="p-2.5">Parent Mobile</th>
                       <th className="p-2.5">Request ID</th>
                       <th className="p-2.5">Faculty Status</th>
                       <th className="p-2.5">Warden Status</th>
@@ -791,19 +790,19 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                     {filteredRequests.map((r, i) => {
                       const bStyle = getStatusBadgeStyle(r.status);
                       const history = getApprovalHistory(r);
+                      const parentMobileVal = r.parentPhone || r.parentMobile || '—';
                       return (
                         <tr key={r.requestId || r.id || r._id || i} className="hover:bg-amber-50/40 transition-colors">
                           <td className="p-2.5 font-semibold text-gray-400">{i + 1}</td>
                           <td className="p-2.5 font-bold text-gray-900">{r.name || '—'}</td>
                           <td className="p-2.5 font-mono text-gray-600">{r.reg || '—'}</td>
-                          <td className="p-2.5 text-gray-700 font-mono">{r.studentPhone || r.phone || '—'}</td>
+                          <td className="p-2.5 text-gray-900 font-mono font-semibold">{parentMobileVal}</td>
                           <td className="p-2.5 text-gray-700">{r.department || '—'}</td>
                           <td className="p-2.5 text-gray-700 font-semibold">{normalizeYear(r.year)}</td>
                           <td className="p-2.5 text-gray-700">{r.room || '—'}</td>
                           <td className="p-2.5 text-gray-700 max-w-[180px] truncate" title={r.dest}>{r.dest || '—'}</td>
                           <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.fromDate || '—'}</td>
                           <td className="p-2.5 text-gray-600 whitespace-nowrap">{r.toDate || '—'}</td>
-                          <td className="p-2.5 text-gray-700 font-mono">{r.parentPhone || '—'}</td>
                           <td className="p-2.5 font-mono text-xs font-semibold text-indigo-700">{r.requestId || r.id || '—'}</td>
                           <td className="p-2.5 text-gray-700 font-medium">{history.facultyStatus}</td>
                           <td className="p-2.5 text-gray-700 font-medium">{history.wardenStatus}</td>
@@ -840,7 +839,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                       <th className="p-3">#</th>
                       <th className="p-3">Student Name</th>
                       <th className="p-3">Register Number</th>
-                      <th className="p-3">Phone Number</th>
+                      <th className="p-3">PARENT MOBILE</th>
                       <th className="p-3">Department</th>
                       <th className="p-3">Year</th>
                       <th className="p-3 text-center">Total Requests</th>
@@ -855,7 +854,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                         <td className="p-3 font-semibold text-gray-400">{i + 1}</td>
                         <td className="p-3 font-bold text-gray-900">{st.name}</td>
                         <td className="p-3 font-mono text-gray-600">{st.reg}</td>
-                        <td className="p-3 text-gray-700 font-mono">{st.phone || '—'}</td>
+                        <td className="p-3 text-gray-900 font-mono font-semibold">{st.phone || '—'}</td>
                         <td className="p-3 text-gray-700">{st.department}</td>
                         <td className="p-3 text-gray-700 font-semibold">{st.year}</td>
                         <td className="p-3 text-center font-bold text-gray-800 bg-gray-50">{st.total}</td>

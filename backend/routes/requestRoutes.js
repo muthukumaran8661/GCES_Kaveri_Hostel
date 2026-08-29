@@ -338,9 +338,10 @@ router.get('/report', protect, async (req, res) => {
         ...r,
         department: u?.department || r.department || '',
         year: u?.year || r.year || '',
-        studentPhone: u?.phone || r.studentPhone || '',
         room: r.room || u?.room || '',
-        dest: r.dest || u?.homeAddress || ''
+        dest: r.dest || u?.homeAddress || '',
+        parentPhone: r.parentPhone || '',
+        parentMobile: r.parentPhone || ''
       };
     });
 
