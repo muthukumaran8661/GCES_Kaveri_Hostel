@@ -249,16 +249,16 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
     switch (action) {
       case 'faculty_approved':
         request.status = 'pending_staff';
-        request.facultyActionBy = req.user.name || req.user.username;
+        request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
-        request.log.push(`Faculty Advisor (${req.user.name}) approved — forwarded to Warden`);
+        request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Approved — forwarded to Warden`);
         break;
       case 'faculty_rejected':
         request.status = 'faculty_rejected';
-        request.facultyActionBy = req.user.name || req.user.username;
+        request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
         request.rejectionReason = req.body.reason || 'Declined by Faculty Advisor';
-        request.log.push(`Faculty Advisor (${req.user.name}) declined the request`);
+        request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request`);
         break;
       case 'staff_approved':
         request.status = 'notifying_parent';

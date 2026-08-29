@@ -65,6 +65,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [homeAddress, setHomeAddress] = useState('');
 
   // Staff/Faculty form state
+  const [staffName, setStaffName] = useState('');
   const [staffId, setStaffId] = useState('');
   const [designation, setDesignation] = useState('');
   const [department, setDepartment] = useState('CSE');
@@ -137,6 +138,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         homeAddress: homeAddress.trim()
       });
     } else {
+      if (role === 'faculty' && !staffName.trim()) {
+        setError('Faculty Name is required.');
+        return;
+      }
       if (!staffId.trim()) {
         setError(role === 'faculty' ? 'Faculty ID is required.' : 'Warden ID is required.');
         return;
@@ -165,7 +170,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         role: role,
         username: staffId.trim(),
         password: staffPass.trim(),
-        name: staffId.trim(),
+        name: role === 'faculty' ? staffName.trim() : (staffName.trim() || staffId.trim()),
         staffId: staffId.trim(),
         designation: designation.trim() || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden'),
         department: role === 'staff' ? 'Hostel Administration' : department.trim(),
@@ -361,77 +366,150 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 </>
               ) : (
                 <>
-                  <div className="gkof-row">
-                    <div className="gkof-field">
-                      <label>{role === 'faculty' ? 'Faculty ID' : 'Warden ID'}</label>
-                      <input
-                        placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. Muthu@123'}
-                        value={staffId}
-                        onChange={(e) => setStaffId(e.target.value)}
-                      />
+                  {role === 'faculty' ? (
+                    <>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Faculty Name</label>
+                          <input
+                            placeholder="Enter Faculty Name"
+                            value={staffName}
+                            onChange={(e) => setStaffName(e.target.value)}
+                          />
+                        </div>
+                        <div className="gkof-field">
+                          <label>Faculty ID</label>
+                          <input
+                            placeholder="e.g. FAC-CSE-01"
+                            value={staffId}
+                            onChange={(e) => setStaffId(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Designation</label>
+                          <input
+                            placeholder="Faculty Advisor"
+                            value={designation}
+                            onChange={(e) => setDesignation(e.target.value)}
+                          />
+                        </div>
+                        <div className="gkof-field">
+                          <label>Department</label>
+                          <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+                            <option value="CSE">CSE</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                            <option value="Mechatronics">Mechatronics</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Assigned Year</label>
+                          <select value={year} onChange={(e) => setYear(e.target.value)}>
+                            <option value="I Year">I Year</option>
+                            <option value="II Year">II Year</option>
+                            <option value="III Year">III Year</option>
+                            <option value="IV Year">IV Year</option>
+                            <option value="All Years">All Years</option>
+                          </select>
+                        </div>
+                        <div className="gkof-field">
+                          <label>Email</label>
+                          <input
+                            type="email"
+                            placeholder="e.g. faculty@gces.edu"
+                            value={staffEmail}
+                            onChange={(e) => setStaffEmail(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Warden ID</label>
+                          <input
+                            placeholder="e.g. Muthu@123"
+                            value={staffId}
+                            onChange={(e) => setStaffId(e.target.value)}
+                          />
+                        </div>
+                        <div className="gkof-field">
+                          <label>Designation</label>
+                          <input
+                            placeholder="Hostel Warden"
+                            value={designation}
+                            onChange={(e) => setDesignation(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Department</label>
+                          <select value="Hostel Administration" disabled style={{ backgroundColor: '#F1F3F4', cursor: 'not-allowed', color: '#2A2140', fontWeight: 600 }}>
+                            <option value="Hostel Administration">Hostel Administration</option>
+                          </select>
+                        </div>
+                        <div className="gkof-field">
+                          <label>Academic Year</label>
+                          <select value={year} onChange={(e) => setYear(e.target.value)}>
+                            <option value="I Year">I Year</option>
+                            <option value="II Year">II Year</option>
+                            <option value="III Year">III Year</option>
+                            <option value="IV Year">IV Year</option>
+                            <option value="All Years">All Years</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="gkof-row">
+                        <div className="gkof-field">
+                          <label>Email</label>
+                          <input
+                            type="email"
+                            placeholder="e.g. warden@gces.edu"
+                            value={staffEmail}
+                            onChange={(e) => setStaffEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="gkof-field">
+                          <label>Phone</label>
+                          <input
+                            type="tel"
+                            placeholder="10-digit mobile"
+                            maxLength={10}
+                            pattern="[0-9]{10}"
+                            inputMode="numeric"
+                            title="Phone number must be exactly 10 digits"
+                            value={staffPhone}
+                            onChange={(e) => handleStaffPhoneChange(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {role === 'faculty' && (
+                    <div className="gkof-row">
+                      <div className="gkof-field">
+                        <label>Phone</label>
+                        <input
+                          type="tel"
+                          placeholder="10-digit mobile"
+                          maxLength={10}
+                          pattern="[0-9]{10}"
+                          inputMode="numeric"
+                          title="Phone number must be exactly 10 digits"
+                          value={staffPhone}
+                          onChange={(e) => handleStaffPhoneChange(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="gkof-field">
-                      <label>Designation</label>
-                      <input
-                        placeholder={role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden'}
-                        value={designation}
-                        onChange={(e) => setDesignation(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="gkof-row">
-                    <div className="gkof-field">
-                      <label>Department</label>
-                      {role === 'staff' ? (
-                        <select value="Hostel Administration" disabled style={{ backgroundColor: '#F1F3F4', cursor: 'not-allowed', color: '#2A2140', fontWeight: 600 }}>
-                          <option value="Hostel Administration">Hostel Administration</option>
-                        </select>
-                      ) : (
-                        <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-                          <option value="CSE">CSE</option>
-                          <option value="ECE">ECE</option>
-                          <option value="EEE">EEE</option>
-                          <option value="Mechanical">Mechanical</option>
-                          <option value="Civil">Civil</option>
-                          <option value="Mechatronics">Mechatronics</option>
-                        </select>
-                      )}
-                    </div>
-                    <div className="gkof-field">
-                      <label>{role === 'faculty' ? 'Assigned Year' : 'Academic Year'}</label>
-                      <select value={year} onChange={(e) => setYear(e.target.value)}>
-                        <option value="I Year">I Year</option>
-                        <option value="II Year">II Year</option>
-                        <option value="III Year">III Year</option>
-                        <option value="IV Year">IV Year</option>
-                        <option value="All Years">All Years</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="gkof-row">
-                    <div className="gkof-field">
-                      <label>Email</label>
-                      <input
-                        type="email"
-                        placeholder="e.g. faculty@gces.edu"
-                        value={staffEmail}
-                        onChange={(e) => setStaffEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="gkof-field">
-                      <label>Phone</label>
-                      <input
-                        type="tel"
-                        placeholder="10-digit mobile"
-                        maxLength={10}
-                        pattern="[0-9]{10}"
-                        inputMode="numeric"
-                        title="Phone number must be exactly 10 digits"
-                        value={staffPhone}
-                        onChange={(e) => handleStaffPhoneChange(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  )}
                   <div className="gkof-field">
                     <label>Choose Password</label>
                     <PasswordInput

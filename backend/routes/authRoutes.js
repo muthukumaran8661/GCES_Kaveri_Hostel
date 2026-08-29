@@ -60,6 +60,9 @@ router.post('/signup', async (req, res) => {
       }
       finalDepartment = 'Hostel Administration';
     } else if (role === 'faculty') {
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Faculty Name is required.' });
+      }
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
       }
