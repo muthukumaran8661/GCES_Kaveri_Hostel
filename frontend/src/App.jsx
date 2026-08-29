@@ -39,6 +39,22 @@ export default function App() {
     loadAll();
   }, []);
 
+  async function refreshSession() {
+    try {
+      const token = localStorage.getItem('gkof_token');
+      if (token) {
+        const res = await apiFetch('/api/auth/me');
+        if (res && res.user) {
+          setSession(res.user);
+          return res.user;
+        }
+      }
+    } catch (e) {
+      console.error('refreshSession error:', e);
+    }
+    return null;
+  }
+
   async function loadAll() {
     try {
       const token = localStorage.getItem('gkof_token');
@@ -56,6 +72,14 @@ export default function App() {
       console.error('loadAll error:', e);
     } finally {
       setLoaded(true);
+    }
+  }
+
+  async function refreshData() {
+    const latestUser = await refreshSession();
+    const currentUser = latestUser || session;
+    if (currentUser) {
+      await fetchRequestsForUser(currentUser);
     }
   }
 
@@ -121,7 +145,7 @@ export default function App() {
   const handleSubmitRequest = async (reqData) => {
     try {
       await apiFetch('/api/requests', 'POST', reqData);
-      await fetchRequestsForUser(session);
+      await refreshData();
     } catch (err) {
       alert(err.message || 'Failed to submit request');
     }
@@ -130,7 +154,7 @@ export default function App() {
   const handleAction = async (id, act) => {
     try {
       await apiFetch(`/api/requests/${id}/action`, 'PATCH', { action: act });
-      await fetchRequestsForUser(session);
+      await refreshData();
     } catch (err) {
       alert(err.message || 'Action failed');
     }
@@ -139,7 +163,7 @@ export default function App() {
   const handleShareLocation = async (id, lat, lng) => {
     try {
       await apiFetch(`/api/requests/${id}/location`, 'PATCH', { lat, lng });
-      await fetchRequestsForUser(session);
+      await refreshData();
     } catch (err) {
       alert(err.message || 'Failed to share location');
     }
@@ -176,13 +200,13 @@ export default function App() {
           <div className="gkof-tabs">
             <div
               className={`gkof-tab ${currentTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('dashboard')}
+              onClick={() => { setCurrentTab('dashboard'); refreshData(); }}
             >
               Dashboard
             </div>
             <div
               className={`gkof-tab ${currentTab === 'profile' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('profile')}
+              onClick={() => { setCurrentTab('profile'); refreshData(); }}
             >
               Profile
             </div>
@@ -193,7 +217,7 @@ export default function App() {
               currentTab === 'profile' ? (
                 <StaffProfile session={session} onLogout={handleLogout} />
               ) : (
-                <StaffDashboard session={session} requests={requests} onAction={handleAction} onRefreshUsers={() => fetchRequestsForUser(session)} />
+                <StaffDashboard session={session} requests={requests} onAction={handleAction} onRefreshUsers={refreshData} />
               )
             ) : currentTab === 'profile' ? (
               <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} />

@@ -1,10 +1,31 @@
 import React from 'react';
 import logo from './../assets/logo.png'
 
+function normalizeYear(y) {
+  if (!y) return 'All Years';
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I Year';
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II Year';
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III Year';
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV Year';
+  if (/ALL/i.test(s)) return 'All Years';
+  return s;
+}
+
 export default function Header({ session, onLogout, subtitle }) {
-  const roleLabel = session
-    ? (session.role === 'staff' ? (session.designation || 'Warden') : `ID ${session.studentId || session.username || ''}`)
-    : '';
+  let roleLabel = '';
+  if (session) {
+    if (session.role === 'staff' || session.role === 'admin') {
+      const yearStr = normalizeYear(session.year);
+      roleLabel = yearStr && yearStr !== 'All Years' ? `${yearStr} Warden` : (session.designation || 'Warden');
+    } else if (session.role === 'faculty') {
+      const yearStr = normalizeYear(session.year);
+      const yearText = yearStr && yearStr !== 'All Years' ? ` (${yearStr})` : '';
+      roleLabel = `${session.department || 'Faculty'}${yearText} Advisor`;
+    } else {
+      roleLabel = `ID ${session.studentId || session.username || ''}`;
+    }
+  }
 
   return (
     <div className="gkof-hero">

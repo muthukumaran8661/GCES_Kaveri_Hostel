@@ -15,6 +15,10 @@ export default function StaffProfile({ session, onLogout }) {
   const initial = (session.name || session.staffId || '?').trim().charAt(0).toUpperCase() || '?';
   const [showConfirm, setShowConfirm] = useState(false);
   const displayYear = normalizeYear(session.year);
+  const isWarden = session.role === 'staff' || session.role === 'admin';
+  const displayDesignation = isWarden
+    ? (displayYear && displayYear !== 'All Years' ? `${displayYear} Warden` : (session.designation || 'Warden'))
+    : (session.designation || 'Faculty Advisor');
 
   const handleLogoutClick = () => {
     setShowConfirm(true);
@@ -31,18 +35,18 @@ export default function StaffProfile({ session, onLogout }) {
         <div className="gkof-avatar staff-avatar">{initial}</div>
         <div className="gkof-profile-name">{session.name || session.staffId || 'Warden'}</div>
         <div className="gkof-profile-role">
-          {session.role === 'faculty' ? 'Faculty Advisor' : 'Warden'} · {session.department || 'All Depts'} ({displayYear})
+          {isWarden ? 'Warden' : 'Faculty Advisor'} · {isWarden ? 'Hostel Administration' : (session.department || 'All Depts')} ({displayYear})
         </div>
       </div>
 
       <div className="gkof-card">
         <h3>Personal &amp; Authorization Details</h3>
         <div className="gkof-profile-row"><span className="k">Name</span><span className="v">{session.name || session.staffId || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">{session.role === 'faculty' ? 'Faculty ID' : 'Warden ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ textTransform: 'capitalize' }}>{session.role === 'staff' ? 'Warden' : session.role}</span></div>
-        <div className="gkof-profile-row"><span className="k">Designation</span><span className="v">{session.designation || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || '—'}</span></div>
-        <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v">{displayYear}</span></div>
+        <div className="gkof-profile-row"><span className="k">{isWarden ? 'Warden ID' : 'Faculty ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
+        <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ fontWeight: 600 }}>{isWarden ? 'Warden' : 'Faculty Advisor'}</span></div>
+        <div className="gkof-profile-row"><span className="k">Designation</span><span className="v" style={{ fontWeight: 600 }}>{displayDesignation}</span></div>
+        <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{isWarden ? 'Hostel Administration' : (session.department || '—')}</span></div>
+        <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v" style={{ fontWeight: 600 }}>{displayYear}</span></div>
         <div className="gkof-profile-row">
           <span className="k">Approval Status</span>
           <span className="v" style={{ fontWeight: 600, color: session.status === 'inactive' ? 'var(--red)' : 'var(--green)' }}>

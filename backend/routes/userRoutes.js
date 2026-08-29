@@ -142,6 +142,20 @@ router.get('/staff-list', protect, protectWardenAllowlist, async (req, res) => {
 // @route   PUT /api/users/:id/admin-update
 // @desc    Admin endpoint to update faculty/staff member's department, year, role, or status
 // @access  Private (Staff/Admin)
+function normalizeYearDisplay(y) {
+  if (!y) return 'All Years';
+  const s = String(y).trim();
+  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I Year';
+  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II Year';
+  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III Year';
+  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV Year';
+  if (/ALL/i.test(s)) return 'All Years';
+  return s;
+}
+
+// @route   PUT /api/users/:id/admin-update
+// @desc    Admin endpoint to update faculty/staff member's department, year, role, or status
+// @access  Private (Staff/Admin)
 router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res) => {
   try {
     if (!['staff', 'admin'].includes(req.user.role)) {
@@ -167,12 +181,19 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
     }
     if (year !== undefined) targetUser.year = year.trim();
     if (status !== undefined) targetUser.status = status.trim();
-    if (designation !== undefined) targetUser.designation = designation.trim();
 
     if (['staff', 'admin'].includes(targetUser.role)) {
       targetUser.department = 'Hostel Administration';
-    } else if (department !== undefined) {
-      targetUser.department = department.trim();
+      const normY = normalizeYearDisplay(targetUser.year);
+      targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} Warden` : 'Warden');
+    } else if (targetUser.role === 'faculty') {
+      if (department !== undefined) {
+        targetUser.department = department.trim();
+      } else if (targetUser.department === 'Hostel Administration') {
+        targetUser.department = 'CSE';
+      }
+      const normY = normalizeYearDisplay(targetUser.year);
+      targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} ${targetUser.department || ''} Faculty Advisor` : 'Faculty Advisor');
     }
 
     await targetUser.save();
@@ -185,10 +206,14 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
         username: targetUser.username,
         role: targetUser.role,
         name: targetUser.name,
+        staffId: targetUser.staffId,
         designation: targetUser.designation,
         department: targetUser.department,
         year: targetUser.year,
-        status: targetUser.status
+        status: targetUser.status,
+        email: targetUser.email || '',
+        phone: targetUser.phone || '',
+        homeAddress: targetUser.homeAddress || ''
       }
     });
   } catch (error) {

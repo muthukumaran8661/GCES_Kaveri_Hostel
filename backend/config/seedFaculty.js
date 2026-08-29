@@ -62,19 +62,20 @@ async function seedFacultyAccounts() {
         });
         console.log(`[Seed] Pre-created Faculty Advisor account: ${f.name} (${f.department} - ${f.year})`);
       } else {
-        // Enforce fixed profile details for pre-seeded faculty accounts
-        existingUser.role = 'faculty';
-        existingUser.name = f.name;
-        existingUser.staffId = f.staffId;
-        existingUser.designation = 'Faculty';
-        existingUser.department = f.department;
-        existingUser.year = f.year;
-        existingUser.email = f.email;
-        existingUser.phone = f.phone;
-        existingUser.status = 'active';
+        // Do NOT overwrite user-modified fields like role, department, year, designation, status!
+        let modified = false;
+        if (!existingUser.name) { existingUser.name = f.name; modified = true; }
+        if (!existingUser.staffId) { existingUser.staffId = f.staffId; modified = true; }
+        if (!existingUser.department) { existingUser.department = f.department; modified = true; }
+        if (!existingUser.year) { existingUser.year = f.year; modified = true; }
+        if (!existingUser.designation) { existingUser.designation = 'Faculty Advisor'; modified = true; }
+        if (!existingUser.email) { existingUser.email = f.email; modified = true; }
+        if (!existingUser.phone) { existingUser.phone = f.phone; modified = true; }
 
-        await existingUser.save();
-        console.log(`[Seed] Verified Faculty Advisor account: ${f.name} (${f.department} - ${f.year})`);
+        if (modified) {
+          await existingUser.save();
+        }
+        console.log(`[Seed] Verified Faculty Advisor account: ${f.name} (${existingUser.department} - ${existingUser.year})`);
       }
     }
 

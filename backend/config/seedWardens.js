@@ -72,24 +72,25 @@ async function seedWardenAccounts() {
         });
         console.log(`[Seed] Pre-created Warden account: ${w.staffId} (${w.year})`);
       } else {
-        // Ensure fixed profile fields are up to date
-        existingUser.role = 'staff';
-        existingUser.name = w.name;
-        existingUser.staffId = w.staffId;
-        existingUser.designation = w.designation;
-        existingUser.department = 'Hostel Administration';
-        existingUser.year = w.year;
-        existingUser.email = w.email;
-        existingUser.phone = w.phone;
-        existingUser.status = 'active';
-
-        // Update password if env password changed
-        if (rawPassword) {
-          existingUser.password = rawPassword;
+        // Do NOT overwrite user-modified fields like role, year, designation, department, status, email, phone!
+        // Only initialize missing fields or update password if explicitly provided in environment
+        let modified = false;
+        if (!existingUser.name) { existingUser.name = w.name; modified = true; }
+        if (!existingUser.staffId) { existingUser.staffId = w.staffId; modified = true; }
+        if (!existingUser.department) { existingUser.department = 'Hostel Administration'; modified = true; }
+        if (!existingUser.year) { existingUser.year = w.year; modified = true; }
+        if (!existingUser.designation) { existingUser.designation = w.designation; modified = true; }
+        if (!existingUser.email) { existingUser.email = w.email; modified = true; }
+        if (!existingUser.phone) { existingUser.phone = w.phone; modified = true; }
+        if (process.env[w.envPasswordKey]) {
+          existingUser.password = process.env[w.envPasswordKey];
+          modified = true;
         }
 
-        await existingUser.save();
-        console.log(`[Seed] Verified Warden account: ${w.staffId} (${w.year})`);
+        if (modified) {
+          await existingUser.save();
+        }
+        console.log(`[Seed] Verified Warden account: ${w.staffId} (${existingUser.year})`);
       }
     }
 

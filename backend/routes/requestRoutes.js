@@ -155,12 +155,12 @@ function normalizeYearKey(y) {
 }
 
 function getWardenYearKey(user) {
-  if (user.year) {
+  if (user && user.year) {
     const k = normalizeYearKey(user.year);
-    if (['I', 'II', 'III', 'IV'].includes(k)) return k;
+    if (['I', 'II', 'III', 'IV', 'ALL'].includes(k)) return k;
   }
-  const uname = (user.username || user.staffId || '').toLowerCase();
-  const name = (user.name || '').toLowerCase();
+  const uname = (user?.username || user?.staffId || '').toLowerCase();
+  const name = (user?.name || '').toLowerCase();
 
   if (uname.includes('deva') || name.includes('deva')) return 'I';
   if (uname.includes('rajesh') || name.includes('rajesh')) return 'II';
