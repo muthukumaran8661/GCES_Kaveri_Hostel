@@ -78,11 +78,11 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const returnedToday = requests.filter(r => r.status === 'returned');
 
   // Queue logic:
-  // For Faculty: only show requests awaiting faculty approval (pending_faculty)
-  // For Staff/Warden: show pending_staff and notifying_parent
+  // For Faculty: show requests awaiting faculty advisor approval (pending_faculty)
+  // For Staff/Warden: show requests awaiting warden approval (pending_staff) and parent calls (notifying_parent)
   const queue = isFaculty
     ? pendingFaculty
-    : [...pendingFaculty, ...pendingStaff, ...notifying];
+    : [...pendingStaff, ...notifying];
 
   const activeOut = outNow.slice();
   const history = requests.filter(r => ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status));

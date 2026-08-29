@@ -5,7 +5,8 @@ const WARDEN_ALLOWLIST = [
     username: 'muthu@123',
     staffId: 'Muthu@123',
     name: 'Muthukumaran G',
-    designation: 'Warden',
+    designation: 'IV Year Warden',
+    year: 'IV Year',
     email: 'muthuwarden@gmail.com',
     phone: '1234567890',
     envPasswordKey: 'WARDEN_MUTHU_PASSWORD',
@@ -15,7 +16,8 @@ const WARDEN_ALLOWLIST = [
     username: 'rajesh@123',
     staffId: 'Rajesh@123',
     name: 'Rajesh P',
-    designation: 'Warden',
+    designation: 'II Year Warden',
+    year: 'II Year',
     email: 'rajeshwarden@gmail.com',
     phone: '0987654321',
     envPasswordKey: 'WARDEN_RAJESH_PASSWORD',
@@ -25,7 +27,8 @@ const WARDEN_ALLOWLIST = [
     username: 'deva@123',
     staffId: 'Deva@123',
     name: 'Deva N',
-    designation: 'Warden',
+    designation: 'I Year Warden',
+    year: 'I Year',
     email: 'devawarden@gmail.com',
     phone: '6789054321',
     envPasswordKey: 'WARDEN_DEVA_PASSWORD',
@@ -35,7 +38,8 @@ const WARDEN_ALLOWLIST = [
     username: 'prince@123',
     staffId: 'Prince@123',
     name: 'Prince P',
-    designation: 'Warden',
+    designation: 'III Year Warden',
+    year: 'III Year',
     email: 'princewarden@gmail.com',
     phone: '1234509876',
     envPasswordKey: 'WARDEN_PRINCE_PASSWORD',
@@ -61,11 +65,12 @@ async function seedWardenAccounts() {
           staffId: w.staffId,
           designation: w.designation,
           department: 'Hostel Administration',
+          year: w.year,
           email: w.email,
           phone: w.phone,
           status: 'active'
         });
-        console.log(`[Seed] Pre-created Warden account: ${w.staffId}`);
+        console.log(`[Seed] Pre-created Warden account: ${w.staffId} (${w.year})`);
       } else {
         // Ensure fixed profile fields are up to date
         existingUser.role = 'staff';
@@ -73,6 +78,7 @@ async function seedWardenAccounts() {
         existingUser.staffId = w.staffId;
         existingUser.designation = w.designation;
         existingUser.department = 'Hostel Administration';
+        existingUser.year = w.year;
         existingUser.email = w.email;
         existingUser.phone = w.phone;
         existingUser.status = 'active';
@@ -83,7 +89,7 @@ async function seedWardenAccounts() {
         }
 
         await existingUser.save();
-        console.log(`[Seed] Verified Warden account: ${w.staffId}`);
+        console.log(`[Seed] Verified Warden account: ${w.staffId} (${w.year})`);
       }
     }
 

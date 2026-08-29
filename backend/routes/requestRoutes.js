@@ -154,6 +154,21 @@ function normalizeYearKey(y) {
   return s.toUpperCase();
 }
 
+function getWardenYearKey(user) {
+  if (user.year) {
+    const k = normalizeYearKey(user.year);
+    if (['I', 'II', 'III', 'IV'].includes(k)) return k;
+  }
+  const uname = (user.username || user.staffId || '').toLowerCase();
+  const name = (user.name || '').toLowerCase();
+
+  if (uname.includes('deva') || name.includes('deva')) return 'I';
+  if (uname.includes('rajesh') || name.includes('rajesh')) return 'II';
+  if (uname.includes('prince') || name.includes('prince')) return 'III';
+  if (uname.includes('muthu') || name.includes('muthukumaran')) return 'IV';
+  return 'ALL';
+}
+
 // @route   GET /api/requests/staff
 // @desc    Get all requests for staff/faculty dashboard queues
 // @access  Private (Staff/Faculty/Admin)
@@ -192,6 +207,21 @@ router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
         const reqDept = (r.department || '').trim().toLowerCase();
         const reqYear = normalizeYearKey(r.year);
         return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
+      });
+      return res.json({ success: true, requests: filtered });
+    }
+
+    // Dynamic Warden Filter: Year-Wise Wardens ONLY see requests matching their assigned Student Year
+    // AND Wardens MUST NOT see weekday requests before Faculty Advisor approval (pending_faculty)
+    if (req.user.role === 'staff') {
+      const wardenYear = getWardenYearKey(req.user);
+
+      const filtered = enrichedRequests.filter(r => {
+        const reqYear = normalizeYearKey(r.year);
+        if (wardenYear !== 'ALL' && reqYear !== wardenYear) return false;
+        // MUST NOT RECEIVE EARLY: Weekday requests pending faculty approval stay strictly with Faculty Advisor
+        if (r.type === 'weekday' && r.status === 'pending_faculty') return false;
+        return true;
       });
       return res.json({ success: true, requests: filtered });
     }
@@ -241,6 +271,35 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
           return res.status(403).json({
             success: false,
             message: `403 Forbidden: You are not authorized to approve this student's request. Your assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match Student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
+          });
+        }
+      }
+    }
+
+    // STRICT BACKEND AUTHORIZATION FOR WARDEN APPROVAL / DECLINE
+    if (action === 'staff_approved' || action === 'staff_rejected') {
+      if (req.user.role !== 'staff' && req.user.role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: '403 Forbidden: Only assigned Wardens are authorized to take action on this request.'
+        });
+      }
+
+      if (req.user.role === 'staff') {
+        const wardenYear = getWardenYearKey(req.user);
+        const reqYear = normalizeYearKey(request.year);
+
+        if (wardenYear !== 'ALL' && reqYear !== wardenYear) {
+          return res.status(403).json({
+            success: false,
+            message: `403 Forbidden: You are not authorized to approve requests for ${request.year || 'this Year'}. You are assigned as ${req.user.name} (${wardenYear} Year Warden).`
+          });
+        }
+
+        if (request.type === 'weekday' && request.status === 'pending_faculty') {
+          return res.status(403).json({
+            success: false,
+            message: '403 Forbidden: Weekday out pass requires Faculty Advisor approval before Warden approval.'
           });
         }
       }
