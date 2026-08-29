@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
 import StudentRequestReport, { exportRequestsToExcel } from './StudentRequestReport';
-import GateScannerModal from './GateScannerModal';
 
 async function apiFetch(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -52,7 +51,6 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
 
   const facYearDisplay = normalizeYear(session?.year);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [showScannerModal, setShowScannerModal] = useState(false);
 
   if ((isAdminOrWarden && !isAuthorizedWarden) || (isFaculty && !isAuthorizedFaculty)) {
     return (
@@ -230,14 +228,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              className="gkof-btn"
-              style={{ background: '#0D9488', color: '#FFF', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setShowScannerModal(true)}
-            >
-              <span>📷</span> <span>Gate QR Scanner</span>
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               className="gkof-btn"
               style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
@@ -450,14 +441,6 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           requests={requests}
           onClose={() => setShowReportModal(false)}
           onRefresh={onRefreshUsers}
-        />
-      )}
-
-      {showScannerModal && (
-        <GateScannerModal
-          session={session}
-          onClose={() => setShowScannerModal(false)}
-          onRefreshData={onRefreshUsers}
         />
       )}
     </>

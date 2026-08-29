@@ -136,7 +136,7 @@ router.get('/student', protect, async (req, res) => {
       let status = r.qrStatus || 'ACTIVE';
 
       if (['approved_final', 'returned'].includes(r.status) && !token) {
-        token = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+        token = `${r.requestId || 'REQ'}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
         status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
         await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
       }
@@ -208,7 +208,7 @@ router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
       let status = r.qrStatus || 'ACTIVE';
 
       if (['approved_final', 'returned'].includes(r.status) && !token) {
-        token = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+        token = `${r.requestId || 'REQ'}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
         status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
         await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
       }
@@ -361,7 +361,8 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
       case 'parent_approved':
         request.status = 'approved_final';
         if (!request.qrToken) {
-          request.qrToken = `QR-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+          const randHex = crypto.randomBytes(3).toString('hex').toUpperCase();
+          request.qrToken = `${request.requestId || 'REQ'}-${randHex}`;
           request.qrStatus = 'ACTIVE';
         }
         request.log.push('Parent confirmed by call/OTP — Out Pass APPROVED and QR code generated');
