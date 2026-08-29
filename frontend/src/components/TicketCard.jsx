@@ -321,32 +321,6 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
         {isAccepted && <div className="gkof-outcome accepted">✅ Your Request was successfully Accepted</div>}
         {isDeclined && <div className="gkof-outcome declined">❌ Your Request was declined</div>}
 
-        {/* Approved Out Pass QR Code Display Section */}
-        {(isAccepted || r.status === 'returned') && (
-          <div className="gkof-qr-card-section" style={{ marginTop: '14px', padding: '12px 16px', background: '#FAF8F2', border: '1px solid #D9A441', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div style={{ background: '#FFF', padding: '6px', borderRadius: '10px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-              <QRCodeSVG value={r.qrToken || r.requestId} size={110} level="H" includeMargin={false} />
-            </div>
-            <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#9E1B32', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                Official Gate Verification QR Code
-              </div>
-              <div style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#2A2140', marginTop: '2px' }}>
-                Token ID: {r.qrToken || r.requestId}
-              </div>
-              <div style={{ fontSize: '11.5px', color: '#5F6368', marginTop: '4px', lineHeight: 1.35 }}>
-                {r.status === 'returned' ? (
-                  <span style={{ color: '#5F6368', fontWeight: 700 }}>🔴 Pass Complete &amp; QR Permanently Expired</span>
-                ) : r.qrStatus === 'OUT' ? (
-                  <span style={{ color: '#B06000', fontWeight: 700 }}>🟡 CURRENTLY OUT — Present at gate for MARK BACK</span>
-                ) : (
-                  <span style={{ color: '#137333', fontWeight: 700 }}>🟢 ACTIVE — Present at gate for MARK OUT</span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* GPS Tracking Section */}
         {(canShareLocation || canViewLocation) && (
           <div className="gkof-gps-section">
@@ -439,17 +413,8 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
         )}
 
         {isDownloadable && (
-          <div className="gkof-btn-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
+          <div className="gkof-btn-row">
             <button className="gkof-btn gold" onClick={downloadOutPass}>⬇️ Download Out Pass (PDF)</button>
-            {onViewQr && (
-              <button
-                className="gkof-btn teal"
-                style={{ background: '#0D9488', color: '#fff', fontWeight: 'bold' }}
-                onClick={() => onViewQr(r)}
-              >
-                📱 View Gate Pass QR
-              </button>
-            )}
           </div>
         )}
         {r.status === 'notifying_parent' && (
