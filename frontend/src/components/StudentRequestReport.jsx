@@ -541,49 +541,72 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-[var(--gold-soft)] overflow-hidden my-4 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-[calc(100vw-16px)] sm:w-full max-w-6xl bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-[var(--gold-soft)] overflow-hidden my-2 sm:my-4 flex flex-col max-h-[95vh] text-slate-800 max-w-full">
         {/* Modal Header */}
-        <div className="bg-[#9E1B32] text-white p-4 px-6 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">📊</span>
-            <div>
-              <h2 className="font-serif text-lg font-bold leading-tight">Report</h2>
-              <p className="text-xs text-gold-soft opacity-90">
-                {isFaculty
-                  ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`
-                  : 'Hostel Out Pass Portal — View, filter and export student out pass request and approval data'}
-              </p>
+        <div className="bg-[#9E1B32] text-white p-3.5 sm:p-4 px-4 sm:px-6 flex flex-col md:flex-row md:items-center justify-between gap-3 flex-shrink-0 relative">
+          {/* Header Title & Subtitle + Mobile Close Button */}
+          <div className="flex items-start justify-between w-full md:w-auto">
+            <div className="flex items-center gap-2.5 sm:gap-3 pr-2">
+              <span className="text-xl sm:text-2xl flex-shrink-0">📊</span>
+              <div>
+                <h2 className="font-serif text-base sm:text-lg font-bold leading-tight">Report</h2>
+                <div className="text-[11px] sm:text-xs text-[var(--gold-soft)] opacity-95 leading-tight mt-0.5 md:hidden">
+                  <p className="font-semibold">Hostel Out Pass Portal</p>
+                  <p className="text-[10.5px] opacity-85 mt-0.5">
+                    {isFaculty
+                      ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`
+                      : 'View, filter and export student out pass request and approval data'}
+                  </p>
+                </div>
+                <p className="hidden md:block text-xs text-[var(--gold-soft)] opacity-90">
+                  {isFaculty
+                    ? `Authorized Scope: ${facDept} - ${facYear} Faculty Advisor`
+                    : 'Hostel Out Pass Portal — View, filter and export student out pass request and approval data'}
+                </p>
+              </div>
             </div>
+            {/* Mobile Close Button (top-right) */}
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg text-lg leading-none transition-colors cursor-pointer flex-shrink-0 -mr-1 -mt-1"
+              aria-label="Close Modal"
+            >
+              ✕
+            </button>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Header Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
             <button
               onClick={handleExportExcel}
-              className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 md:flex-none min-h-[34px] whitespace-nowrap"
               title="Export Current Filtered Data to Excel (.xlsx)"
             >
-              <span>📊</span> Export Excel
+              <span>📊</span> <span>Export Excel</span>
             </button>
             <button
               onClick={generatePDF}
               disabled={isGeneratingPDF}
-              className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 flex-1 md:flex-none min-h-[34px] whitespace-nowrap"
               title="Download PDF Summary"
             >
-              <span>📥</span> PDF
+              <span>📥</span> <span>PDF</span>
             </button>
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                className="px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 md:flex-none min-h-[34px] whitespace-nowrap"
                 title="Refresh Live Data"
               >
-                🔄 Refresh
+                <span>🔄</span> <span>Refresh</span>
               </button>
             )}
+            {/* Desktop Close Button */}
             <button
               onClick={onClose}
-              className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg text-lg leading-none transition-colors cursor-pointer"
+              className="hidden md:flex p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg text-lg leading-none transition-colors cursor-pointer items-center justify-center"
+              aria-label="Close Modal"
             >
               ✕
             </button>
@@ -591,21 +614,21 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         </div>
 
         {/* Filters Bar */}
-        <div className="p-3.5 px-6 bg-[var(--cream-soft)] border-b border-[var(--line)] flex flex-col gap-3 flex-shrink-0">
-          <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="p-3 sm:p-3.5 px-4 sm:px-6 bg-[var(--cream-soft)] border-b border-[var(--line)] flex flex-col gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="grid grid-cols-1 md:flex md:flex-wrap md:items-center gap-2.5 sm:gap-3 text-xs">
             {isFaculty ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg font-medium">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg font-medium w-full md:w-auto">
                 <span>🔒 Scope Locked:</span>
                 <b>{facDept} ({facYear})</b>
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-1.5">
-                  <label className="font-semibold text-gray-700">Department:</label>
+                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+                  <label className="font-semibold text-gray-700 text-xs">Department</label>
                   <select
                     value={filterDept}
                     onChange={e => setFilterDept(e.target.value)}
-                    className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                    className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
                   >
                     <option value="ALL">All Departments</option>
                     <option value="CSE">CSE</option>
@@ -617,12 +640,12 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                   </select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <label className="font-semibold text-gray-700">Year:</label>
+                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+                  <label className="font-semibold text-gray-700 text-xs">Year</label>
                   <select
                     value={filterYear}
                     onChange={e => setFilterYear(e.target.value)}
-                    className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                    className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
                   >
                     <option value="ALL">All Years</option>
                     <option value="I Year">I Year</option>
@@ -634,12 +657,12 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
               </>
             )}
 
-            <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-gray-700">Status:</label>
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+              <label className="font-semibold text-gray-700 text-xs">Status</label>
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
-                className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="APPROVED">Approved / Out</option>
@@ -649,94 +672,101 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
               </select>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-gray-700">Date:</label>
-              <input
-                type="date"
-                value={filterDate}
-                onChange={e => setFilterDate(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
-              />
-              {filterDate && (
-                <button onClick={() => setFilterDate('')} className="text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear Date">✕</button>
-              )}
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+              <label className="font-semibold text-gray-700 text-xs">Date</label>
+              <div className="flex items-center gap-1.5 w-full md:w-auto">
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={e => setFilterDate(e.target.value)}
+                  className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
+                />
+                {filterDate && (
+                  <button onClick={() => setFilterDate('')} className="text-gray-400 hover:text-gray-600 text-xs font-bold p-1 cursor-pointer" title="Clear Date">✕</button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-gray-700">From Date:</label>
+          <div className="grid grid-cols-1 md:flex md:flex-wrap md:items-center gap-2.5 sm:gap-3 text-xs">
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+              <label className="font-semibold text-gray-700 text-xs">From Date</label>
               <input
                 type="date"
                 value={fromDateFilter}
                 onChange={e => setFromDateFilter(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
               />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-gray-700">To Date:</label>
-              <input
-                type="date"
-                value={toDateFilter}
-                onChange={e => setToDateFilter(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
-              />
-              {(fromDateFilter || toDateFilter) && (
-                <button
-                  onClick={() => { setFromDateFilter(''); setToDateFilter(''); }}
-                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
-                  title="Clear Date Range"
-                >
-                  Clear Range ✕
-                </button>
-              )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-              <label className="font-semibold text-gray-700">Search:</label>
-              <input
-                type="text"
-                placeholder="Search Name, Reg No, Parent Mobile, Request ID..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear Search">✕</button>
-              )}
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
+              <label className="font-semibold text-gray-700 text-xs">To Date</label>
+              <div className="flex items-center gap-1.5 w-full md:w-auto">
+                <input
+                  type="date"
+                  value={toDateFilter}
+                  onChange={e => setToDateFilter(e.target.value)}
+                  className="w-full md:w-auto px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border"
+                />
+                {(fromDateFilter || toDateFilter) && (
+                  <button
+                    onClick={() => { setFromDateFilter(''); setToDateFilter(''); }}
+                    className="text-gray-400 hover:text-gray-600 text-xs font-bold p-1 cursor-pointer whitespace-nowrap"
+                    title="Clear Date Range"
+                  >
+                    Clear Range ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:flex-1 md:min-w-[200px]">
+              <label className="font-semibold text-gray-700 text-xs">Search</label>
+              <div className="relative w-full flex items-center">
+                <input
+                  type="text"
+                  placeholder="Search Name, Reg No, Parent Mob..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border pr-7"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2 text-gray-400 hover:text-gray-600 text-xs font-bold p-1 cursor-pointer" title="Clear Search">✕</button>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* 5 Summary Statistics Cards */}
-        <div className="p-3.5 px-6 grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white flex-shrink-0">
-          <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-center">
-            <div className="text-lg font-bold text-indigo-800">{totalStudents}</div>
+        <div className="p-3 sm:p-3.5 px-4 sm:px-6 grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-3 bg-white flex-shrink-0 border-b border-gray-100">
+          <div className="p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl text-center shadow-xs">
+            <div className="text-lg sm:text-xl font-bold text-indigo-800">{totalStudents}</div>
             <div className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider mt-0.5">Total Students</div>
           </div>
-          <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-center">
-            <div className="text-lg font-bold text-gray-800">{stats.total}</div>
+          <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-center shadow-xs">
+            <div className="text-lg sm:text-xl font-bold text-gray-800">{stats.total}</div>
             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mt-0.5">Total Requests</div>
           </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-            <div className="text-lg font-bold text-emerald-700">{stats.approved}</div>
+          <div className="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-center shadow-xs">
+            <div className="text-lg sm:text-xl font-bold text-emerald-700">{stats.approved}</div>
             <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mt-0.5">Approved</div>
           </div>
-          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
-            <div className="text-lg font-bold text-amber-700">{stats.pending}</div>
+          <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-center shadow-xs">
+            <div className="text-lg sm:text-xl font-bold text-amber-700">{stats.pending}</div>
             <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mt-0.5">Pending</div>
           </div>
-          <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
-            <div className="text-lg font-bold text-rose-700">{stats.rejected}</div>
+          <div className="p-2.5 bg-rose-50/80 border border-rose-200 rounded-xl text-center shadow-xs col-span-2 md:col-span-1">
+            <div className="text-lg sm:text-xl font-bold text-rose-700">{stats.rejected}</div>
             <div className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider mt-0.5">Rejected</div>
           </div>
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="px-6 border-b border-gray-200 bg-gray-50/50 flex gap-4 text-xs font-semibold flex-shrink-0">
+        <div className="px-4 sm:px-6 border-b border-gray-200 bg-gray-50/50 flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold flex-shrink-0">
           <button
             onClick={() => setActiveTab('detailed')}
-            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] sm:text-xs whitespace-nowrap ${
               activeTab === 'detailed'
                 ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -746,7 +776,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
           </button>
           <button
             onClick={() => setActiveTab('summary')}
-            className={`py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] sm:text-xs whitespace-nowrap ${
               activeTab === 'summary'
                 ? 'border-[var(--maroon)] text-[var(--maroon)] font-bold'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -757,7 +787,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         </div>
 
         {/* Main Content Area */}
-        <div className="p-4 px-6 overflow-y-auto flex-1">
+        <div className="p-3 sm:p-4 px-3 sm:px-6 overflow-y-auto flex-1 max-w-full">
           {activeTab === 'detailed' ? (
             filteredRequests.length === 0 ? (
               <div className="py-12 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
@@ -765,7 +795,7 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                 <p className="font-semibold text-sm">No student out pass request records match your filters.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm max-w-full">
                 <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
                   <thead>
                     <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10px]">
@@ -832,8 +862,8 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                 <p className="font-semibold text-sm">No student statistics match your selected filters.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm max-w-full">
+                <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                   <thead>
                     <tr className="bg-[#2A2140] text-white font-serif uppercase tracking-wider text-[10.5px]">
                       <th className="p-3">#</th>
@@ -871,20 +901,20 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3 px-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 flex-shrink-0">
-          <div>
+        <div className="p-3 px-4 sm:px-6 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 flex-shrink-0">
+          <div className="text-center sm:text-left text-[11px] sm:text-xs">
             Showing <b>{studentWiseStats.length}</b> unique students | <b>{filteredRequests.length}</b> out pass requests
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
             <button
               onClick={handleExportExcel}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-none min-h-[34px] text-xs"
             >
-              <span>📊</span> Export Excel (.xlsx)
+              <span>📊</span> <span>Export Excel (.xlsx)</span>
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer"
+              className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 active:scale-95 text-gray-700 font-semibold rounded-lg transition-all cursor-pointer flex-1 sm:flex-none justify-center min-h-[34px] text-xs"
             >
               Close Report
             </button>
