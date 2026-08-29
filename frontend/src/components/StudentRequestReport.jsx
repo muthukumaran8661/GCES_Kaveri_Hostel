@@ -621,6 +621,27 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                   {(fromDateFilter || toDateFilter) && <button onClick={() => { setFromDateFilter(''); setToDateFilter(''); }} className="text-gray-400 hover:text-gray-600 text-xs font-bold p-1 cursor-pointer">✕</button>}
                 </div>
               </div>
+              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:flex-1 md:min-w-[220px]">
+                <label className="font-semibold text-gray-700 text-xs">Search</label>
+                <div className="relative w-full flex items-center">
+                  <input
+                    type="text"
+                    placeholder="Search Name, Reg No, Parent Mob..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none box-border pr-7"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 text-gray-400 hover:text-gray-600 text-xs font-bold p-1 cursor-pointer"
+                      title="Clear Search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
