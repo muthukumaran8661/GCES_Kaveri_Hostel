@@ -32,7 +32,7 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function StaffDashboard({ session, requests, onAction, onRefreshUsers, activeTab = 'dashboard' }) {
+export default function StaffDashboard({ session, requests, onAction, onRefreshUsers, activeTab = 'dashboard', onNavigateTab }) {
   const isFaculty = session && session.role === 'faculty';
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
@@ -334,6 +334,45 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     );
   }
 
+  if (activeTab === 'history') {
+    return (
+      <>
+        {/* Separate History Page Banner */}
+        <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', color: '#FFF' }}>📜 Out Pass History</h2>
+              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--gold-soft)' }}>
+                View all completed "Outpass Ready", returned, and declined student out pass records ({history.length} records)
+              </p>
+            </div>
+            {onNavigateTab && (
+              <button
+                className="gkof-btn"
+                style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+                onClick={() => onNavigateTab('dashboard')}
+              >
+                ← Back to Dashboard
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Completed History List */}
+        <div className="gkof-card">
+          <h3>Completed &amp; Archived Records <span className="count">{history.length}</span></h3>
+          <div>
+            {history.length ? (
+              history.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={onAction} />)
+            ) : (
+              <div className="gkof-empty">No completed or archived history records found.</div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Faculty Scope Banner */}
@@ -353,7 +392,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         </div>
       )}
 
-      {/* Report Quick Access Card */}
+      {/* Report & History Quick Access Card */}
       <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -362,14 +401,23 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px', color: '#FFF' }}>
-                Report
+                Reports &amp; Archive
               </div>
               <div style={{ fontSize: '12px', color: 'var(--gold-soft)', marginTop: '2px' }}>
                 View, filter and export student out pass request and approval data
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {onNavigateTab && (
+              <button
+                className="gkof-btn"
+                style={{ background: 'var(--maroon)', color: '#FFF', border: '1px solid var(--gold-soft)', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+                onClick={() => onNavigateTab('history')}
+              >
+                📜 View History ({history.length})
+              </button>
+            )}
             <button
               className="gkof-btn"
               style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
@@ -433,16 +481,22 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         </div>
       </div>
 
-      {/* History */}
-      <div className="gkof-card">
-        <h3>History <span className="count">{history.length}</span></h3>
+      {/* History Clean Summary Card */}
+      <div className="gkof-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          {history.length ? (
-            history.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={onAction} />)
-          ) : (
-            <div className="gkof-empty">No completed or declined records yet.</div>
-          )}
+          <h3 style={{ margin: 0 }}>📜 Completed Request History <span className="count">{history.length}</span></h3>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
+            All completed "Outpass Ready", returned, and declined records are archived safely in History.
+          </p>
         </div>
+        {onNavigateTab && (
+          <button
+            className="gkof-btn maroon"
+            onClick={() => onNavigateTab('history')}
+          >
+            📜 Open History Page ({history.length})
+          </button>
+        )}
       </div>
 
       {showReportModal && (
