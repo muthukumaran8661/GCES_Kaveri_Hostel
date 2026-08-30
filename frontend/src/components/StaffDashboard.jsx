@@ -32,7 +32,7 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function StaffDashboard({ session, requests, onAction, onRefreshUsers }) {
+export default function StaffDashboard({ session, requests, onAction, onRefreshUsers, activeTab = 'dashboard' }) {
   const isFaculty = session && session.role === 'faculty';
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
@@ -196,6 +196,144 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     }
   };
 
+  const renderAdminControlTable = () => (
+    <div className="gkof-card" style={{ borderColor: 'var(--gold)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h3 style={{ margin: 0 }}>⚙️ Admin Control – Faculty Approval Permissions</h3>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
+            Assign or update Faculty Department, Academic Year, Role, or Active/Inactive status.
+          </p>
+        </div>
+        <button className="gkof-btn ghost" onClick={loadStaffList}>🔄 Refresh List</button>
+      </div>
+
+      {updateMsg && (
+        <div style={{ background: '#E6F4EA', color: 'var(--green)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>
+          ✓ {updateMsg}
+        </div>
+      )}
+
+      {loadingStaff ? (
+        <div className="gkof-empty">Loading faculty permissions list…</div>
+      ) : staffUsers.length === 0 ? (
+        <div className="gkof-empty">No faculty members found in the system.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--cream-soft)', borderBottom: '2px solid var(--gold-soft)', color: 'var(--ink)' }}>
+                <th style={{ padding: '10px' }}>Name / ID</th>
+                <th style={{ padding: '10px' }}>Role</th>
+                <th style={{ padding: '10px' }}>Department</th>
+                <th style={{ padding: '10px' }}>Assigned Year</th>
+                <th style={{ padding: '10px' }}>Status</th>
+                <th style={{ padding: '10px', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortStaffUsers(staffUsers).map(u => {
+                const isEditing = editingUserId === (u._id || u.id);
+                return (
+                  <tr key={u._id || u.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '10px' }}>
+                      <b>{u.name || u.username}</b>
+                      <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>ID: {u.staffId || u.username}</div>
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {isEditing ? (
+                        <select
+                          value={editForm.role}
+                          onChange={e => {
+                            const r = e.target.value;
+                            setEditForm({
+                              ...editForm,
+                              role: r,
+                              department: (r === 'staff' || r === 'admin') ? 'Hostel Administration' : (editForm.department === 'Hostel Administration' ? 'CSE' : editForm.department)
+                            });
+                          }}
+                          style={{ padding: '4px', fontSize: '12px' }}
+                        >
+                          <option value="faculty">Faculty Advisor</option>
+                          <option value="staff">Warden</option>
+                        </select>
+                      ) : (
+                        <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{u.role === 'staff' ? 'Warden' : u.role === 'faculty' ? 'Faculty Advisor' : u.role}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {isEditing ? (
+                        (editForm.role === 'staff' || editForm.role === 'admin') ? (
+                          <select value="Hostel Administration" disabled style={{ padding: '4px', fontSize: '12px', backgroundColor: '#F1F3F4', cursor: 'not-allowed' }}>
+                            <option value="Hostel Administration">Hostel Administration</option>
+                          </select>
+                        ) : (
+                          <select value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
+                            <option value="CSE">CSE</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                            <option value="Mechatronics">Mechatronics</option>
+                          </select>
+                        )
+                      ) : (
+                        u.department || '—'
+                      )}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {isEditing ? (
+                        <select value={editForm.year} onChange={e => setEditForm({ ...editForm, year: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
+                          <option value="I Year">I Year</option>
+                          <option value="II Year">II Year</option>
+                          <option value="III Year">III Year</option>
+                          <option value="IV Year">IV Year</option>
+                          <option value="All Years">All Years</option>
+                        </select>
+                      ) : (
+                        normalizeYear(u.year) || '—'
+                      )}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {isEditing ? (
+                        <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      ) : (
+                        <span style={{ color: u.status === 'inactive' ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
+                          {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button className="gkof-btn green" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => handleAdminUpdate(u._id || u.id)}>Save</button>
+                          <button className="gkof-btn ghost" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => setEditingUserId(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <button className="gkof-btn teal" style={{ padding: '4px 10px', fontSize: '11.5px' }} onClick={() => startEdit(u)}>Edit Permissions</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  if (activeTab === 'admin') {
+    return (
+      <>
+        {isAdminOrWarden && renderAdminControlTable()}
+      </>
+    );
+  }
+
   return (
     <>
       {/* Faculty Scope Banner */}
@@ -306,137 +444,6 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           )}
         </div>
       </div>
-
-      {/* Admin Control Panel (Visible to Warden / Admin) */}
-      {isAdminOrWarden && (
-        <div className="gkof-card" style={{ marginTop: '24px', borderColor: 'var(--gold)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-            <div>
-              <h3 style={{ margin: 0 }}>⚙️ Admin Control – Faculty Approval Permissions</h3>
-              <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
-                Assign or update Faculty Department, Academic Year, Role, or Active/Inactive status.
-              </p>
-            </div>
-            <button className="gkof-btn ghost" onClick={loadStaffList}>🔄 Refresh List</button>
-          </div>
-
-          {updateMsg && (
-            <div style={{ background: '#E6F4EA', color: 'var(--green)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>
-              ✓ {updateMsg}
-            </div>
-          )}
-
-          {loadingStaff ? (
-            <div className="gkof-empty">Loading faculty permissions list…</div>
-          ) : staffUsers.length === 0 ? (
-            <div className="gkof-empty">No faculty members found in the system.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: 'var(--cream-soft)', borderBottom: '2px solid var(--gold-soft)', color: 'var(--ink)' }}>
-                    <th style={{ padding: '10px' }}>Name / ID</th>
-                    <th style={{ padding: '10px' }}>Role</th>
-                    <th style={{ padding: '10px' }}>Department</th>
-                    <th style={{ padding: '10px' }}>Assigned Year</th>
-                    <th style={{ padding: '10px' }}>Status</th>
-                    <th style={{ padding: '10px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortStaffUsers(staffUsers).map(u => {
-                    const isEditing = editingUserId === (u._id || u.id);
-                    return (
-                      <tr key={u._id || u.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                        <td style={{ padding: '10px' }}>
-                          <b>{u.name || u.username}</b>
-                          <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>ID: {u.staffId || u.username}</div>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          {isEditing ? (
-                            <select
-                              value={editForm.role}
-                              onChange={e => {
-                                const r = e.target.value;
-                                setEditForm({
-                                  ...editForm,
-                                  role: r,
-                                  department: (r === 'staff' || r === 'admin') ? 'Hostel Administration' : (editForm.department === 'Hostel Administration' ? 'CSE' : editForm.department)
-                                });
-                              }}
-                              style={{ padding: '4px', fontSize: '12px' }}
-                            >
-                              <option value="faculty">Faculty Advisor</option>
-                              <option value="staff">Warden</option>
-                            </select>
-                          ) : (
-                            <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{u.role === 'staff' ? 'Warden' : u.role === 'faculty' ? 'Faculty Advisor' : u.role}</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          {isEditing ? (
-                            (editForm.role === 'staff' || editForm.role === 'admin') ? (
-                              <select value="Hostel Administration" disabled style={{ padding: '4px', fontSize: '12px', backgroundColor: '#F1F3F4', cursor: 'not-allowed' }}>
-                                <option value="Hostel Administration">Hostel Administration</option>
-                              </select>
-                            ) : (
-                              <select value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
-                                <option value="CSE">CSE</option>
-                                <option value="ECE">ECE</option>
-                                <option value="EEE">EEE</option>
-                                <option value="Mechanical">Mechanical</option>
-                                <option value="Civil">Civil</option>
-                                <option value="Mechatronics">Mechatronics</option>
-                              </select>
-                            )
-                          ) : (
-                            u.department || '—'
-                          )}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          {isEditing ? (
-                            <select value={editForm.year} onChange={e => setEditForm({ ...editForm, year: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
-                              <option value="I Year">I Year</option>
-                              <option value="II Year">II Year</option>
-                              <option value="III Year">III Year</option>
-                              <option value="IV Year">IV Year</option>
-                              <option value="All Years">All Years</option>
-                            </select>
-                          ) : (
-                            normalizeYear(u.year) || '—'
-                          )}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          {isEditing ? (
-                            <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} style={{ padding: '4px', fontSize: '12px' }}>
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                            </select>
-                          ) : (
-                            <span style={{ color: u.status === 'inactive' ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
-                              {u.status === 'inactive' ? 'Inactive' : 'Active'}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'right' }}>
-                          {isEditing ? (
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                              <button className="gkof-btn green" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => handleAdminUpdate(u._id || u.id)}>Save</button>
-                              <button className="gkof-btn ghost" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => setEditingUserId(null)}>Cancel</button>
-                            </div>
-                          ) : (
-                            <button className="gkof-btn teal" style={{ padding: '4px 10px', fontSize: '11.5px' }} onClick={() => startEdit(u)}>Edit Permissions</button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       {showReportModal && (
         <StudentRequestReport

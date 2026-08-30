@@ -157,6 +157,8 @@ body {
   background: #fff;
   padding: 10px 20px;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .gkof-tab {
