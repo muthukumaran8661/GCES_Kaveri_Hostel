@@ -56,7 +56,6 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
   const showFacultyApprove = viewer === 'staff' && r.status === 'pending_faculty';
   const showStaffApprove = viewer === 'staff' && r.status === 'pending_staff';
   const showParentRecord = viewer === 'staff' && r.status === 'notifying_parent';
-  const showReturn = viewer === 'staff' && r.status === 'approved_final';
   const justStamped = r.status === 'approved_final' || r.status === 'returned';
   const isAccepted = r.status === 'approved_final';
   const isDeclined = REJECTED_STATUSES.includes(r.status);
@@ -154,8 +153,8 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
   function renderTimeline() {
     const isWeekday = type === 'weekday';
     const steps = isWeekday
-      ? [{ label: 'Submitted' }, { label: 'Faculty Advisor' }, { label: 'Warden OK' }, { label: 'Parent OK' }, { label: 'Out / Back' }]
-      : [{ label: 'Submitted' }, { label: 'Warden OK' }, { label: 'Parent OK' }, { label: 'Out / Back' }];
+      ? [{ label: 'Submitted' }, { label: 'Faculty Advisor' }, { label: 'Warden OK' }, { label: 'Parent OK' }, { label: 'Outpass Ready' }]
+      : [{ label: 'Submitted' }, { label: 'Warden OK' }, { label: 'Parent OK' }, { label: 'Outpass Ready' }];
     let doneUpto = 0;
     if (isWeekday) {
       if (r.status === 'pending_staff') doneUpto = 1;
@@ -470,11 +469,6 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
               <button className="gkof-btn red" onClick={() => onAction(displayId, 'parent_rejected')}>Parent Declined</button>
             </div>
           </>
-        )}
-        {showReturn && (
-          <div className="gkof-btn-row">
-            <button className="gkof-btn ghost" onClick={() => onAction(displayId, 'returned')}>Mark Returned to Hostel</button>
-          </div>
         )}
         {r.log && r.log.length > 0 && (
           <div className="gkof-note">{r.log.join(' → ')}</div>
