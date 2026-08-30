@@ -40,7 +40,7 @@ function formatStatus(status) {
     case 'pending_faculty': return 'Pending Faculty';
     case 'pending_staff': return 'Pending Warden';
     case 'notifying_parent': return 'Calling Parent';
-    case 'approved_final': return 'Approved — Out';
+    case 'approved_final': return 'Outpass Ready';
     case 'returned': return 'Returned Safe';
     case 'faculty_rejected': return 'Faculty Declined';
     case 'staff_rejected': return 'Warden Declined';

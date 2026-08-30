@@ -74,7 +74,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const pendingFaculty = requests.filter(r => r.status === 'pending_faculty');
   const pendingStaff = requests.filter(r => r.status === 'pending_staff');
   const notifying = requests.filter(r => r.status === 'notifying_parent');
-  const outNow = requests.filter(r => r.status === 'approved_final');
+  const outNow = requests.filter(r => r.qrStatus === 'OUT');
   const returnedToday = requests.filter(r => r.status === 'returned');
 
   // Queue logic:
@@ -85,7 +85,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     : [...pendingStaff, ...notifying];
 
   const activeOut = outNow.slice();
-  const history = requests.filter(r => ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status));
+  const history = requests.filter(r =>
+    ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status) ||
+    (r.status === 'approved_final' && r.qrStatus !== 'OUT')
+  );
 
   // Admin Control State
   const [staffUsers, setStaffUsers] = useState([]);

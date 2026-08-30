@@ -32,7 +32,7 @@ const STATUS_META = {
   staff_rejected: { label: 'Warden Declined', cls: 'bg-[#F8DAD5] text-danger' },
   notifying_parent: { label: 'Calling Parent', cls: 'bg-[#DCE6F5] text-[#1a4fb4]' },
   parent_rejected: { label: 'Parent Declined', cls: 'bg-[#F8DAD5] text-danger' },
-  approved_final: { label: 'Approved — Out', cls: 'bg-maroon text-white' },
+  approved_final: { label: 'Outpass Ready', cls: 'bg-maroon text-white' },
   returned: { label: 'Returned', cls: 'bg-[#E6E1F0] text-ink-soft' }
 };
 
@@ -298,7 +298,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
   }
 
   const reqYearDisplay = normalizeYear(r.year);
-  const showQrOnPass = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
+  const showQrOnPass = (r.status === 'approved_final' || r.status === 'returned');
 
   return (
     <div className="gkof-ticket">
