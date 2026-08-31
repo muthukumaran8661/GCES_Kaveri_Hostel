@@ -1026,8 +1026,130 @@ body {
 }
 
 /* =====================================================================
+   WARDEN FORGOT PASSWORD & MODAL STYLES
+   ===================================================================== */
+.gkof-forgot-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.gkof-forgot-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--maroon);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.gkof-forgot-link:hover {
+  color: var(--maroon-dark);
+}
+
+.gkof-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(42, 33, 64, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: gkof-fade-in 0.2s ease-out;
+}
+
+.gkof-modal-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: gkof-scale-up 0.2s ease-out;
+}
+
+.gkof-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gkof-modal-close:hover {
+  background: var(--maroon);
+  color: #fff;
+}
+
+.gkof-modal-header {
+  margin-bottom: 16px;
+}
+
+.gkof-modal-badge {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--maroon-dark);
+  background: var(--gold-soft);
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+.gkof-modal-header h2 {
+  font-family: 'Roboto Slab', serif;
+  font-size: 18px;
+  color: var(--maroon-dark);
+  margin: 4px 0 0;
+}
+
+.gkof-modal-desc {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+@keyframes gkof-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gkof-scale-up {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* =====================================================================
    MOBILE RESPONSIVE
    ===================================================================== */
+
 @media (max-width: 700px) {
   .gkof-content-pad { padding: 16px 14px; }
   .gkof-auth-wrap { padding: 20px 10px 28px; }

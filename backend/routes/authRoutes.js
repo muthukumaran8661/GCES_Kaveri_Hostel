@@ -3,6 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect, WARDEN_ALLOWLIST_USERNAMES, FACULTY_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
+const { sendEmail } = require('../utils/mailer');
+
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key', {
@@ -221,4 +223,161 @@ router.get('/me', protect, async (req, res) => {
   });
 });
 
+// @route   POST /api/auth/warden/forgot-password
+// @desc    Initiate password reset for Warden account via email
+// @access  Public
+router.post('/warden/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter your registered email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Verify that the email matches a registered Warden account
+    const wardenUser = await User.findOne({
+      email: cleanEmail,
+      role: { $in: ['staff', 'admin'] }
+    });
+
+    if (!wardenUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'No registered Warden account found with this email address.'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    wardenUser.resetOtp = otp;
+    wardenUser.resetOtpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+
+    await wardenUser.save();
+
+    // Send Email
+    await sendEmail({
+      to: wardenUser.email,
+      subject: 'GCES Kaveri Hostel - Warden Password Reset OTP',
+      text: `Hello ${wardenUser.name || 'Warden'},\n\nYour OTP for password reset is: ${otp}\nThis OTP is valid for 10 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #2A2140; max-width: 500px; margin: 0 auto; border: 1px solid #EAD9BE; border-radius: 12px; background-color: #FBF6EC;">
+          <h2 style="color: #9E1B32; margin-top: 0;">GCES Kaveri Hostel Admin</h2>
+          <p style="font-size: 14px;">Hello <strong>${wardenUser.name || 'Warden'}</strong>,</p>
+          <p style="font-size: 14px;">Your OTP for resetting your Warden account password is:</p>
+          <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #127A6E; padding: 12px 20px; background: #EAF6F4; display: inline-block; border-radius: 8px; margin: 12px 0; border: 1px solid #127A6E;">${otp}</div>
+          <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 10 minutes.</p>
+          <hr style="border: none; border-top: 1px solid #EAD9BE; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #7A7290;">If you did not request a password reset, please ignore this message.</p>
+        </div>
+      `
+    });
+
+    return res.json({
+      success: true,
+      message: `Password reset OTP sent to ${wardenUser.email}.`,
+      email: wardenUser.email,
+      otpPreview: otp
+    });
+  } catch (error) {
+    console.error('Warden forgot-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error processing password reset request.' });
+  }
+});
+
+// @route   POST /api/auth/warden/verify-otp
+// @desc    Verify OTP for Warden password reset
+// @access  Public
+router.post('/warden/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and OTP are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = otp.trim();
+
+    const wardenUser = await User.findOne({
+      email: cleanEmail,
+      role: { $in: ['staff', 'admin'] }
+    });
+
+    if (!wardenUser) {
+      return res.status(404).json({ success: false, message: 'Warden account not found.' });
+    }
+
+    if (!wardenUser.resetOtp || wardenUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Please check and try again.' });
+    }
+
+    if (!wardenUser.resetOtpExpire || wardenUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'OTP verified successfully.'
+    });
+  } catch (error) {
+    console.error('Warden verify-otp error:', error);
+    return res.status(500).json({ success: false, message: 'Server error verifying OTP.' });
+  }
+});
+
+// @route   POST /api/auth/warden/reset-password
+// @desc    Set new password after OTP verification for Warden
+// @access  Public
+router.post('/warden/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = otp.trim();
+
+    const wardenUser = await User.findOne({
+      email: cleanEmail,
+      role: { $in: ['staff', 'admin'] }
+    });
+
+    if (!wardenUser) {
+      return res.status(404).json({ success: false, message: 'Warden account not found.' });
+    }
+
+    if (!wardenUser.resetOtp || wardenUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Password reset aborted.' });
+    }
+
+    if (!wardenUser.resetOtpExpire || wardenUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
+    }
+
+    // Update password (pre-save hook hashes password using bcrypt)
+    wardenUser.password = newPassword;
+    wardenUser.resetOtp = '';
+    wardenUser.resetOtpExpire = null;
+
+    await wardenUser.save();
+
+    return res.json({
+      success: true,
+      message: 'Password updated successfully! You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('Warden reset-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating password.' });
+  }
+});
+
 module.exports = router;
+
