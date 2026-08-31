@@ -18,7 +18,7 @@ const WARDEN_ALLOWLIST = [
     name: 'Rajesh P',
     designation: 'II Year Warden',
     year: 'II Year',
-    email: 'rajeshwarden@gmail.com',
+    email: 'rajeshwarden30@gmail.com',
     phone: '0987654321',
     envPasswordKey: 'WARDEN_RAJESH_PASSWORD',
     defaultPassword: 'Rajesh@123'
@@ -40,7 +40,7 @@ const WARDEN_ALLOWLIST = [
     name: 'Prince P',
     designation: 'III Year Warden',
     year: 'III Year',
-    email: 'princewarden@gmail.com',
+    email: 'princewarden30@gmail.com',
     phone: '1234509876',
     envPasswordKey: 'WARDEN_PRINCE_PASSWORD',
     defaultPassword: 'Prince@123'
@@ -72,15 +72,13 @@ async function seedWardenAccounts() {
         });
         console.log(`[Seed] Pre-created Warden account: ${w.staffId} (${w.year})`);
       } else {
-        // Do NOT overwrite user-modified fields like role, year, designation, department, status, email, phone!
-        // Only initialize missing fields or update password if explicitly provided in environment
         let modified = false;
         if (!existingUser.name) { existingUser.name = w.name; modified = true; }
         if (!existingUser.staffId) { existingUser.staffId = w.staffId; modified = true; }
         if (!existingUser.department) { existingUser.department = 'Hostel Administration'; modified = true; }
         if (!existingUser.year) { existingUser.year = w.year; modified = true; }
         if (!existingUser.designation) { existingUser.designation = w.designation; modified = true; }
-        if (!existingUser.email) { existingUser.email = w.email; modified = true; }
+        if (existingUser.email !== w.email) { existingUser.email = w.email; modified = true; }
         if (!existingUser.phone) { existingUser.phone = w.phone; modified = true; }
         if (process.env[w.envPasswordKey]) {
           existingUser.password = process.env[w.envPasswordKey];
