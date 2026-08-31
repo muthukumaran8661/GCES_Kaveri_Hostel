@@ -282,9 +282,11 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                 </>
               )}
               <button className="gkof-btn wide" type="submit">Log In</button>
-              <div className="gkof-switch">
-                First time here? <a onClick={() => setAuthMode('signup')}>Create an account</a>
-              </div>
+              {role === 'student' && (
+                <div className="gkof-switch">
+                  First time here? <a onClick={() => setAuthMode('signup')}>Create an account</a>
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={handleSignupSubmit}>

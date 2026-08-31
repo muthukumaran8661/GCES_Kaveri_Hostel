@@ -289,6 +289,20 @@ body {
   display: block;
 }
 
+.gkof-switch {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 14px;
+}
+
+.gkof-switch a {
+  color: var(--maroon);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ---- shared bits (cards, stats, tickets, form fields) ---- */
 .gkof-stats {
   display: grid;
