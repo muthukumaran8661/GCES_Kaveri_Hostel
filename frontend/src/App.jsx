@@ -241,6 +241,14 @@ export default function App() {
             >
               Dashboard
             </div>
+            {!isStaffOrFaculty && (
+              <div
+                className={`gkof-tab ${currentTab === 'history' ? 'active' : ''}`}
+                onClick={() => { setCurrentTab('history'); refreshData(); }}
+              >
+                History
+              </div>
+            )}
             <div
               className={`gkof-tab ${currentTab === 'profile' ? 'active' : ''}`}
               onClick={() => { setCurrentTab('profile'); refreshData(); }}
@@ -281,6 +289,8 @@ export default function App() {
                 onAction={handleAction}
                 onSaveProfileAddress={handleSaveProfileAddress}
                 onShareLocation={handleShareLocation}
+                activeTab={currentTab}
+                onNavigateTab={(tab) => { setCurrentTab(tab); refreshData(); }}
               />
             )}
           </div>

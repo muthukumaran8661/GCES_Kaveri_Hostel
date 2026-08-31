@@ -74,7 +74,16 @@ function TimePicker12Hour({
   );
 }
 
-export default function StudentDashboard({ session, requests, onSubmitRequest, onAction, onSaveProfileAddress, onShareLocation }) {
+export default function StudentDashboard({
+  session,
+  requests,
+  onSubmitRequest,
+  onAction,
+  onSaveProfileAddress,
+  onShareLocation,
+  activeTab = 'dashboard',
+  onNavigateTab
+}) {
   const mine = requests.slice().reverse();
   const total = mine.length;
   const pending = mine.filter(r => ['pending_staff', 'notifying_parent', 'pending_faculty'].includes(r.status)).length;
@@ -448,6 +457,54 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     }
   };
 
+  // Dedicated Student History Page view
+  if (activeTab === 'history') {
+    return (
+      <>
+        {/* Separate History Page Banner */}
+        <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', color: '#FFF' }}>📜 Outpass History</h2>
+              <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--gold-soft)' }}>
+                View all your out pass requests ({total} records) including completed, ready, currently out, returned, and declined records.
+              </p>
+            </div>
+            {onNavigateTab && (
+              <button
+                className="gkof-btn"
+                style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+                onClick={() => onNavigateTab('dashboard')}
+              >
+                ← Back to Dashboard
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Completed History List */}
+        <div className="gkof-card">
+          <h3>Outpass History <span className="count">{total}</span></h3>
+          <div>
+            {mine.length ? (
+              mine.map(r => (
+                <TicketCard
+                  key={r.requestId || r.id || r._id}
+                  request={r}
+                  viewer="student"
+                  onAction={onAction}
+                  onShareLocation={onShareLocation}
+                />
+              ))
+            ) : (
+              <div className="gkof-empty">No out pass requests submitted yet.</div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="gkof-stats">
@@ -622,8 +679,19 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
       </div>
 
       <div className="gkof-card">
-        <h3>📋 My Out Pass Request History <span className="count">{total}</span></h3>
-        <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ margin: 0 }}>📋 My Out Pass Request History <span className="count">{total}</span></h3>
+          {onNavigateTab && (
+            <button
+              className="gkof-btn maroon"
+              style={{ padding: '6px 12px', fontSize: '11.5px' }}
+              onClick={() => onNavigateTab('history')}
+            >
+              📜 Open Full History Page ({total})
+            </button>
+          )}
+        </div>
+        <div style={{ marginTop: '12px' }}>
           {mine.length ? (
             mine.map(r => (
               <TicketCard
