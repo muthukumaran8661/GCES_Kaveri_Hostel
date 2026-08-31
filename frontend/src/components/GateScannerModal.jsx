@@ -34,7 +34,7 @@ export default function GateScannerModal({ session, onClose, onRefreshData }) {
         html5QrcodeScanner.render(
           (decodedText) => {
             if (decodedText) {
-              try { html5QrcodeScanner.clear(); } catch (e) {}
+              try { html5QrcodeScanner.clear(); } catch (e) { console.warn('Scanner clear warning:', e); }
               handleVerify(decodedText);
             }
           },
@@ -52,7 +52,9 @@ export default function GateScannerModal({ session, onClose, onRefreshData }) {
       if (scannerRef.current) {
         try {
           scannerRef.current.clear();
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Scanner unmount clear warning:', e);
+        }
       }
     };
   }, [activeTab, verifyResult]);

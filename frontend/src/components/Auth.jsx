@@ -625,7 +625,8 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
       setInfoMsg(data.message || 'OTP has been sent to your registered email address.');
       setStep('otp');
     } catch (err) {
-      setError(err.message);
+      console.error('Warden Send OTP error:', err);
+      setError(err.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -657,7 +658,8 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
       setInfoMsg('');
       setStep('password');
     } catch (err) {
-      setError(err.message);
+      console.error('Warden Verify OTP error:', err);
+      setError(err.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -696,7 +698,8 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
       }
       setStep('success');
     } catch (err) {
-      setError(err.message);
+      console.error('Warden Reset Password error:', err);
+      setError(err.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -886,7 +889,8 @@ function FacultyForgotPasswordModal({ isOpen, onClose, initialFacultyId = '' }) 
       setInfoMsg(data.message || 'OTP has been sent to your registered email address.');
       setStep('otp');
     } catch (err) {
-      setError(err.message);
+      console.error('Faculty Send OTP error:', err);
+      setError(err.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -919,7 +923,8 @@ function FacultyForgotPasswordModal({ isOpen, onClose, initialFacultyId = '' }) 
       setInfoMsg('');
       setStep('password');
     } catch (err) {
-      setError(err.message);
+      console.error('Faculty Verify OTP error:', err);
+      setError(err.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -959,7 +964,8 @@ function FacultyForgotPasswordModal({ isOpen, onClose, initialFacultyId = '' }) 
       }
       setStep('success');
     } catch (err) {
-      setError(err.message);
+      console.error('Faculty Reset Password error:', err);
+      setError(err.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);
     }

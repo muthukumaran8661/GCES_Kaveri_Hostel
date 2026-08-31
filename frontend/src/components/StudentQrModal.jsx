@@ -43,6 +43,7 @@ export default function StudentQrModal({ request, onClose }) {
         timeStyle: 'short'
       });
     } catch (e) {
+      console.warn('Date formatting error:', e);
       return String(d);
     }
   };

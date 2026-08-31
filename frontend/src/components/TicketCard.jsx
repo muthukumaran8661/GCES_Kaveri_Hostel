@@ -17,6 +17,7 @@ function getLogoBase64(url) {
       try {
         resolve(canvas.toDataURL('image/png'));
       } catch (e) {
+        console.warn('Canvas toDataURL failed:', e);
         resolve(null);
       }
     };

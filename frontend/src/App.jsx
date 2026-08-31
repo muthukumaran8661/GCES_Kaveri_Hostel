@@ -35,6 +35,36 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [authError, setAuthError] = useState('');
 
+  // Global Backspace Key Navigation Prevention
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Backspace' || e.keyCode === 8) {
+        const active = document.activeElement;
+        if (!active) {
+          e.preventDefault();
+          return;
+        }
+
+        const tagName = active.tagName ? active.tagName.toUpperCase() : '';
+        const isContentEditable = active.isContentEditable || active.getAttribute('contenteditable') === 'true';
+        const nonTextInputTypes = ['CHECKBOX', 'RADIO', 'SUBMIT', 'BUTTON', 'RESET', 'FILE', 'IMAGE', 'COLOR', 'RANGE'];
+        const inputType = active.type ? active.type.toUpperCase() : '';
+
+        const isTextInput = (tagName === 'INPUT' && !nonTextInputTypes.includes(inputType)) || tagName === 'TEXTAREA';
+        const isEditable = (isTextInput || isContentEditable) && !active.readOnly && !active.disabled;
+
+        if (!isEditable) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -64,6 +94,7 @@ export default function App() {
           setSession(res.user);
           await fetchRequestsForUser(res.user);
         } catch (e) {
+          console.warn('Session verification failed, logging out:', e);
           localStorage.removeItem('gkof_token');
           setSession(null);
         }
