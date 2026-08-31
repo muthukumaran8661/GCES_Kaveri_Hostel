@@ -186,13 +186,91 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     return { isValid: true, error: '' };
   };
 
+  const validateOutPassType = (oDate, oHour, oMin, oAmpm, type) => {
+    if (!oDate) return { isValid: true, error: '' };
+
+    const [y, m, d] = oDate.split('-').map(Number);
+    const outDateObj = new Date(y, m - 1, d);
+    const dayOfWeek = outDateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+
+    let h = parseInt(oHour, 10) || 0;
+    const min = parseInt(oMin, 10) || 0;
+    if (oAmpm === 'PM' && h < 12) h += 12;
+    if (oAmpm === 'AM' && h === 12) h = 0;
+    const outMinutes = h * 60 + min;
+
+    // RULE 1 — WEEKDAY / EMERGENCY OUT PASS (Faculty & Warden Approval)
+    if (type === 'weekday') {
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return {
+          isValid: false,
+          error: 'Weekday / Emergency Out Pass is valid only from Monday 05:00 AM to Friday 04:30 PM. Please select Weekend Out Pass for weekend dates.',
+          popupTitle: 'Invalid Outpass Type',
+          popupMessage: 'Weekday / Emergency Out Pass is valid only from Monday 05:00 AM to Friday 04:30 PM. Please select Weekend Out Pass for weekend dates.'
+        };
+      }
+      if (dayOfWeek === 5 && outMinutes > 990) {
+        return {
+          isValid: false,
+          error: 'The selected out time falls under Weekend Out Pass timing. Please select a valid Outpass Type: Weekend Out Pass (Warden Approval).',
+          popupTitle: 'Invalid Outpass Type',
+          popupMessage: 'The selected out time falls under Weekend Out Pass timing. Please select a valid Outpass Type: Weekend Out Pass (Warden Approval).'
+        };
+      }
+    }
+
+    // RULE 2 — WEEKEND OUT PASS (Warden Approval)
+    if (type === 'weekend') {
+      if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+        return {
+          isValid: false,
+          error: 'Weekend Out Pass timing starts from Friday 04:31 PM through Sunday. For weekdays, please select Weekday / Emergency Out Pass or Weekday / Government Holiday Out Pass.',
+          popupTitle: 'Invalid Outpass Type',
+          popupMessage: 'Weekend Out Pass timing starts from Friday 04:31 PM through Sunday. For weekdays, please select Weekday / Emergency Out Pass or Weekday / Government Holiday Out Pass.'
+        };
+      }
+      if (dayOfWeek === 5 && outMinutes <= 990) {
+        return {
+          isValid: false,
+          error: 'Friday timing up to 04:30 PM falls under Weekday Out Pass. Weekend Out Pass timing starts from Friday 04:31 PM.',
+          popupTitle: 'Invalid Outpass Type',
+          popupMessage: 'Friday timing up to 04:30 PM falls under Weekday Out Pass. Weekend Out Pass timing starts from Friday 04:31 PM.'
+        };
+      }
+    }
+
+    // RULE 3 — WEEKDAY / GOVERNMENT HOLIDAY OUT PASS (Warden Approval)
+    if (type === 'weekday_govt') {
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return {
+          isValid: false,
+          error: 'Weekday / Government Holiday Out Pass is valid only on weekdays (Monday 05:00 AM to Friday 06:00 PM).',
+          popupTitle: 'Invalid Outpass Type',
+          popupMessage: 'Weekday / Government Holiday Out Pass is valid only on weekdays (Monday 05:00 AM to Friday 06:00 PM).'
+        };
+      }
+    }
+
+    return { isValid: true, error: '' };
+  };
+
   const handleOutChange = (newDate, newHour, newMin, newAmpm) => {
     setOutDate(newDate);
     setOutHour(newHour);
     setOutMin(newMin);
     setOutAmpm(newAmpm);
     const check = validateOutPassDates(newDate, newHour, newMin, newAmpm, returnDate, returnHour, returnMin, returnAmpm);
-    setDateError(check.isValid ? '' : check.error);
+    if (!check.isValid) {
+      setDateError(check.error);
+      return;
+    }
+    const typeCheck = validateOutPassType(newDate, newHour, newMin, newAmpm, requestType);
+    if (!typeCheck.isValid) {
+      setDateError(typeCheck.error);
+      alert(`${typeCheck.popupTitle}\n\n${typeCheck.popupMessage}`);
+    } else {
+      setDateError('');
+    }
   };
 
   const handleReturnChange = (newDate, newHour, newMin, newAmpm) => {
@@ -201,7 +279,30 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     setReturnMin(newMin);
     setReturnAmpm(newAmpm);
     const check = validateOutPassDates(outDate, outHour, outMin, outAmpm, newDate, newHour, newMin, newAmpm);
-    setDateError(check.isValid ? '' : check.error);
+    if (!check.isValid) {
+      setDateError(check.error);
+      return;
+    }
+    const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, requestType);
+    if (!typeCheck.isValid) {
+      setDateError(typeCheck.error);
+    } else {
+      setDateError('');
+    }
+  };
+
+  const handleRequestTypeChange = (newType) => {
+    setRequestType(newType);
+    if (outDate) {
+      const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, newType);
+      if (!typeCheck.isValid) {
+        setDateError(typeCheck.error);
+        alert(`${typeCheck.popupTitle}\n\n${typeCheck.popupMessage}`);
+      } else {
+        const check = validateOutPassDates(outDate, outHour, outMin, outAmpm, returnDate, returnHour, returnMin, returnAmpm);
+        setDateError(check.isValid ? '' : check.error);
+      }
+    }
   };
 
   const handleRoomChange = (e) => {
@@ -228,6 +329,13 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
     if (!val.isValid) {
       alert(val.error);
       setDateError(val.error);
+      return;
+    }
+
+    const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, requestType);
+    if (!typeCheck.isValid) {
+      alert(`${typeCheck.popupTitle}\n\n${typeCheck.popupMessage}`);
+      setDateError(typeCheck.error);
       return;
     }
 
@@ -395,7 +503,7 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
           <div className="gkof-row">
             <div className="gkof-field">
               <label>Request Type</label>
-              <select value={requestType} onChange={(e) => setRequestType(e.target.value)}>
+              <select value={requestType} onChange={(e) => handleRequestTypeChange(e.target.value)}>
                 <option value="weekend">Weekend Out Pass (Warden Approval)</option>
                 <option value="weekday">Weekday / Emergency Out Pass (Faculty &amp; Warden Approval)</option>
                 <option value="weekday_govt">Weekday / Government Holiday Out Pass (Warden Approval)</option>

@@ -88,6 +88,56 @@ router.post('/', protect, async (req, res) => {
 
     const validTypes = ['weekday', 'weekend', 'weekday_govt'];
     const type = validTypes.includes(requestType) ? requestType : 'weekend';
+
+    // SERVER-SIDE REQUEST TYPE VALIDATION
+    const [yNum, mNum, dNum] = fromDatePart.split('-').map(Number);
+    const [hNum, minNum] = fromTimePart.split(':').map(Number);
+    const outDateObj = new Date(yNum, mNum - 1, dNum);
+    const dayOfWeek = outDateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+    const outMinutes = hNum * 60 + minNum;
+
+    // RULE 1 — WEEKDAY / EMERGENCY OUT PASS (Faculty & Warden Approval)
+    if (type === 'weekday') {
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Weekday / Emergency Out Pass is valid only from Monday 05:00 AM to Friday 04:30 PM. Please select Weekend Out Pass for weekend dates.'
+        });
+      }
+      if (dayOfWeek === 5 && outMinutes > 990) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected out time falls under Weekend Out Pass timing. Please select a valid Outpass Type: Weekend Out Pass (Warden Approval).'
+        });
+      }
+    }
+
+    // RULE 2 — WEEKEND OUT PASS (Warden Approval)
+    if (type === 'weekend') {
+      if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+        return res.status(400).json({
+          success: false,
+          message: 'Weekend Out Pass timing starts from Friday 04:31 PM through Sunday. For weekdays, please select Weekday / Emergency Out Pass or Weekday / Government Holiday Out Pass.'
+        });
+      }
+      if (dayOfWeek === 5 && outMinutes <= 990) {
+        return res.status(400).json({
+          success: false,
+          message: 'Friday timing up to 04:30 PM falls under Weekday Out Pass. Weekend Out Pass timing starts from Friday 04:31 PM.'
+        });
+      }
+    }
+
+    // RULE 3 — WEEKDAY / GOVERNMENT HOLIDAY OUT PASS (Warden Approval)
+    if (type === 'weekday_govt') {
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Weekday / Government Holiday Out Pass is valid only on weekdays (Monday 05:00 AM to Friday 06:00 PM).'
+        });
+      }
+    }
+
     const status = type === 'weekday' ? 'pending_faculty' : 'pending_staff';
     const initialLog = type === 'weekday'
       ? 'Submitted by student — awaiting Faculty Advisor'
