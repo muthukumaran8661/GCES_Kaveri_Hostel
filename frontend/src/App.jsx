@@ -23,7 +23,10 @@ async function apiFetch(endpoint, method = 'GET', data = null) {
   const res = await fetch(url, config);
   const result = await res.json();
   if (!res.ok) {
-    throw new Error(result.message || 'API request failed');
+    const error = new Error(result.message || 'API request failed');
+    error.status = res.status;
+    error.remainingSeconds = result.remainingSeconds;
+    throw error;
   }
   return result;
 }
@@ -175,10 +178,12 @@ export default function App() {
 
   const handleSubmitRequest = async (reqData) => {
     try {
-      await apiFetch('/api/requests', 'POST', reqData);
+      const res = await apiFetch('/api/requests', 'POST', reqData);
       await refreshData();
+      return res;
     } catch (err) {
-      alert(err.message || 'Failed to submit request');
+      console.error('Submit request error:', err);
+      throw err;
     }
   };
 

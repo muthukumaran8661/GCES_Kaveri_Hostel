@@ -114,6 +114,57 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
   const [reason, setReason] = useState('');
 
   const [dateError, setDateError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  // Sync remaining cooldown timer with requests history and localStorage
+  useEffect(() => {
+    let highestRemaining = 0;
+
+    if (requests && requests.length > 0) {
+      const userRequests = requests.filter(r => (session.username && r.owner === session.username) || (session.reg && r.reg === session.reg));
+      if (userRequests.length > 0) {
+        const sorted = userRequests.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        const lastReq = sorted[0];
+        if (lastReq && lastReq.createdAt) {
+          const elapsed = Math.floor((Date.now() - new Date(lastReq.createdAt).getTime()) / 1000);
+          if (elapsed >= 0 && elapsed < 60) {
+            highestRemaining = Math.max(highestRemaining, 60 - elapsed);
+          }
+        }
+      }
+    }
+
+    const usernameKey = session?.username || session?.reg || 'user';
+    const localLastTime = localStorage.getItem(`gkof_last_req_${usernameKey}`);
+    if (localLastTime) {
+      const elapsed = Math.floor((Date.now() - parseInt(localLastTime, 10)) / 1000);
+      if (elapsed >= 0 && elapsed < 60) {
+        highestRemaining = Math.max(highestRemaining, 60 - elapsed);
+      }
+    }
+
+    if (highestRemaining > 0) {
+      setCooldownSeconds(highestRemaining);
+    }
+  }, [requests, session]);
+
+  // Countdown timer interval
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setCooldownSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   const get24HourString = (hour12, ampm) => {
     let h = parseInt(hour12, 10) || 0;
@@ -315,6 +366,13 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+
+    if (isSubmitting) return;
+    if (cooldownSeconds > 0) {
+      alert(`Please wait ${cooldownSeconds} seconds before submitting another outpass request.`);
+      return;
+    }
+
     if (!/^[0-9]{10}$/.test(parentPhone.trim())) {
       alert('Parent Mobile No. must be exactly 10 digits.');
       return;
@@ -339,38 +397,55 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
       return;
     }
 
-    if (saveHomeAddr && dest.trim()) {
-      if (onSaveProfileAddress) {
-        await onSaveProfileAddress(dest.trim());
+    setIsSubmitting(true);
+
+    try {
+      if (saveHomeAddr && dest.trim()) {
+        if (onSaveProfileAddress) {
+          await onSaveProfileAddress(dest.trim());
+        }
       }
+
+      const fromDateIso = getIsoString(outDate, outHour, outMin, outAmpm);
+      const toDateIso = getIsoString(returnDate, returnHour, returnMin, returnAmpm);
+
+      await onSubmitRequest({
+        room: room.trim(),
+        dest: dest.trim(),
+        fromDate: fromDateIso,
+        toDate: toDateIso,
+        travel,
+        parentPhone: parentPhone.trim(),
+        requestType,
+        reason: reason.trim(),
+        department: session.department || '',
+        year: session.year || ''
+      });
+
+      const usernameKey = session?.username || session?.reg || 'user';
+      localStorage.setItem(`gkof_last_req_${usernameKey}`, String(Date.now()));
+
+      setOutDate('');
+      setOutHour('05');
+      setOutMin('00');
+      setOutAmpm('AM');
+      setReturnDate('');
+      setReturnHour('06');
+      setReturnMin('00');
+      setReturnAmpm('PM');
+      setReason('');
+      setDateError('');
+
+      setCooldownSeconds(60);
+    } catch (err) {
+      console.error('Submit request error:', err);
+      if (err && err.remainingSeconds) {
+        setCooldownSeconds(err.remainingSeconds);
+      }
+      alert(err.message || 'Failed to submit outpass request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const fromDateIso = getIsoString(outDate, outHour, outMin, outAmpm);
-    const toDateIso = getIsoString(returnDate, returnHour, returnMin, returnAmpm);
-
-    await onSubmitRequest({
-      room: room.trim(),
-      dest: dest.trim(),
-      fromDate: fromDateIso,
-      toDate: toDateIso,
-      travel,
-      parentPhone: parentPhone.trim(),
-      requestType,
-      reason: reason.trim(),
-      department: session.department || '',
-      year: session.year || ''
-    });
-
-    setOutDate('');
-    setOutHour('05');
-    setOutMin('00');
-    setOutAmpm('AM');
-    setReturnDate('');
-    setReturnHour('06');
-    setReturnMin('00');
-    setReturnAmpm('PM');
-    setReason('');
-    setDateError('');
   };
 
   return (
@@ -520,9 +595,29 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
             </div>
           </div>
 
-          <button className="gkof-btn maroon wide" type="submit" style={{ marginTop: '8px' }}>
-            Submit Out Pass Request
+          <button
+            className="gkof-btn maroon wide"
+            type="submit"
+            disabled={isSubmitting || cooldownSeconds > 0 || !!dateError}
+            style={{
+              marginTop: '8px',
+              opacity: (isSubmitting || cooldownSeconds > 0 || !!dateError) ? 0.65 : 1,
+              cursor: (isSubmitting || cooldownSeconds > 0 || !!dateError) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isSubmitting
+              ? '⏳ Submitting Request...'
+              : cooldownSeconds > 0
+                ? `⏳ Please wait ${cooldownSeconds}s before submitting another request`
+                : 'Submit Out Pass Request'
+            }
           </button>
+
+          {cooldownSeconds > 0 && (
+            <div style={{ fontSize: '11.5px', color: 'var(--ink-soft)', textAlign: 'center', marginTop: '6px', fontWeight: 600 }}>
+              ⏳ Cooldown Active: You can submit another outpass request in {cooldownSeconds} seconds.
+            </div>
+          )}
         </form>
       </div>
 

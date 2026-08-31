@@ -33,6 +33,23 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Parent mobile number must be exactly 10 digits.' });
     }
 
+    // BACKEND 1-MINUTE (60 SECONDS) COOLDOWN & DUPLICATE SUBMISSION CHECK
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    const recentRequest = await OutRequest.findOne({
+      owner: req.user.username,
+      createdAt: { $gte: oneMinuteAgo }
+    }).sort({ createdAt: -1 });
+
+    if (recentRequest) {
+      const elapsedSec = Math.floor((Date.now() - new Date(recentRequest.createdAt).getTime()) / 1000);
+      const remainingSec = Math.max(1, 60 - elapsedSec);
+      return res.status(400).json({
+        success: false,
+        message: `Please wait ${remainingSec} second${remainingSec > 1 ? 's' : ''} before submitting another outpass request.`,
+        remainingSeconds: remainingSec
+      });
+    }
+
     // BACKEND DATE & TIME VALIDATION
     const now = new Date();
     const yearNum = now.getFullYear();
