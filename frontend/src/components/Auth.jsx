@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function PasswordInput({ value, onChange, placeholder, readOnly, maxLength, inputMode, style, id, name }) {
   const [show, setShow] = useState(false);
