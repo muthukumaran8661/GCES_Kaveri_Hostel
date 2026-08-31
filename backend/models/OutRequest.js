@@ -62,7 +62,7 @@ const OutRequestSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['weekday', 'weekend'],
+    enum: ['weekday', 'weekend', 'weekday_govt'],
     required: true
   },
   status: {

@@ -398,6 +398,7 @@ export default function StudentDashboard({ session, requests, onSubmitRequest, o
               <select value={requestType} onChange={(e) => setRequestType(e.target.value)}>
                 <option value="weekend">Weekend Out Pass (Warden Approval)</option>
                 <option value="weekday">Weekday / Emergency Out Pass (Faculty &amp; Warden Approval)</option>
+                <option value="weekday_govt">Weekday / Government Holiday Out Pass (Warden Approval)</option>
               </select>
             </div>
             <div className="gkof-field">

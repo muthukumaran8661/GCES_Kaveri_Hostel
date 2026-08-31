@@ -51,8 +51,12 @@ function normalizeYear(y) {
 
 export default function TicketCard({ request: r, viewer, onAction, onShareLocation, onViewQr }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
-  const type = r.type === 'weekday' ? 'weekday' : 'weekend';
-  const typeLabel = type === 'weekday' ? 'Weekday Out Pass' : 'Weekend Out Pass';
+  const type = r.type;
+  const typeLabel = r.type === 'weekday_govt'
+    ? 'Weekday / Government Holiday Out Pass (Warden Approval)'
+    : r.type === 'weekday'
+      ? 'Weekday / Emergency Out Pass (Faculty & Warden Approval)'
+      : 'Weekend Out Pass (Warden Approval)';
   const showFacultyApprove = viewer === 'staff' && r.status === 'pending_faculty';
   const showStaffApprove = viewer === 'staff' && r.status === 'pending_staff';
   const showParentRecord = viewer === 'staff' && r.status === 'notifying_parent';
@@ -272,7 +276,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
     row('Out Date & Time', fmtDate(r.fromDate));
     row('Expected Return', fmtDate(r.toDate));
     row('Reason', r.reason);
-    row('Pass Type', r.type === 'weekday' ? 'Weekday Out Pass' : 'Weekend Out Pass');
+    row('Pass Type', typeLabel);
     row('Current Status', (STATUS_META[r.status] || {}).label || r.status);
 
     if (lastLocation) {

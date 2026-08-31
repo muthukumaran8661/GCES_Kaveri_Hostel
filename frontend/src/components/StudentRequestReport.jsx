@@ -67,7 +67,7 @@ function getStatusBadgeStyle(status) {
 function getApprovalHistory(r) {
   const isWeekday = r.type === 'weekday';
   
-  let facultyStatus = 'N/A (Weekend Pass)';
+  let facultyStatus = r.type === 'weekday_govt' ? 'N/A (Warden Approval)' : 'N/A (Weekend Pass)';
   let wardenStatus = 'Pending';
   let finalStatus = 'Pending Approval';
   let rejectionReason = r.rejectionReason || '';
@@ -112,7 +112,7 @@ function getApprovalHistory(r) {
       finalStatus = 'Returned Safe';
     }
   } else {
-    facultyStatus = 'N/A (Weekend Pass)';
+    facultyStatus = r.type === 'weekday_govt' ? 'N/A (Warden Approval)' : 'N/A (Weekend Pass)';
     if (r.status === 'pending_staff' || r.status === 'pending_faculty') {
       wardenStatus = 'Pending';
       finalStatus = 'Awaiting Warden';

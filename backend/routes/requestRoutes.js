@@ -86,7 +86,8 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Expected Return date & time must be after Out Date & Time.' });
     }
 
-    const type = requestType === 'weekday' ? 'weekday' : 'weekend';
+    const validTypes = ['weekday', 'weekend', 'weekday_govt'];
+    const type = validTypes.includes(requestType) ? requestType : 'weekend';
     const status = type === 'weekday' ? 'pending_faculty' : 'pending_staff';
     const initialLog = type === 'weekday'
       ? 'Submitted by student — awaiting Faculty Advisor'
