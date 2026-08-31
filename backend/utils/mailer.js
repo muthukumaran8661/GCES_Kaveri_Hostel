@@ -1,12 +1,8 @@
 const nodemailer = require('nodemailer');
 
 async function sendEmail({ to, subject, text, html }) {
-  const smtpService = process.env.SMTP_SERVICE || process.env.EMAIL_SERVICE;
-  const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-  const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || (smtpService ? undefined : 'smtp.gmail.com');
-  const smtpPort = process.env.SMTP_PORT || process.env.EMAIL_PORT || 587;
-  const smtpFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || smtpUser;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
 
   if (!smtpUser || !smtpPass) {
     console.error('[Mailer Error] Missing SMTP_USER or SMTP_PASS environment variables.');
@@ -16,33 +12,24 @@ async function sendEmail({ to, subject, text, html }) {
     };
   }
 
-  let transporterConfig;
-
-  if (smtpService) {
-    transporterConfig = {
-      service: smtpService,
-      auth: { user: smtpUser, pass: smtpPass }
-    };
-  } else {
-    transporterConfig = {
-      host: smtpHost,
-      port: Number(smtpPort),
-      secure: Number(smtpPort) === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-      tls: {
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000
-    };
-  }
+  const transporterConfig = {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  };
 
   try {
     const transporter = nodemailer.createTransport(transporterConfig);
 
     const info = await transporter.sendMail({
-      from: `"GCES Kaveri Hostel Admin" <${smtpFrom}>`,
+      from: `"GCES Kaveri Hostel Admin" <${smtpUser}>`,
       to,
       subject,
       text,
@@ -52,15 +39,13 @@ async function sendEmail({ to, subject, text, html }) {
     console.log(`[Mailer] OTP email successfully sent to ${to} (Message ID: ${info.messageId})`);
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`[Mailer Error] Failed to send email to ${to}:`, err);
+    console.error(`[Mailer Error] Failed to send email to ${to}:`, err.message);
 
-    let userFriendlyError = 'Unable to send OTP email. Please try again.';
+    let userFriendlyError = 'Unable to send OTP. Please try again later.';
     if (err.code === 'EAUTH' || err.responseCode === 535) {
-      userFriendlyError = 'SMTP Authentication failed. Invalid email or App Password configured on server.';
+      userFriendlyError = 'SMTP Authentication failed. Please check the Gmail address and 16-character App Password in Render settings.';
     } else if (err.code === 'ESOCKET' || err.code === 'ETIMEDOUT') {
-      userFriendlyError = 'Email server connection timed out. Please try again.';
-    } else if (err.message) {
-      userFriendlyError = `Unable to send OTP: ${err.message}`;
+      userFriendlyError = 'Email server connection timed out. Please try again later.';
     }
 
     return {

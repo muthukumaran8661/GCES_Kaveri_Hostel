@@ -291,7 +291,7 @@ router.post('/warden/forgot-password', async (req, res) => {
     if (!mailResult.success) {
       return res.status(500).json({
         success: false,
-        message: mailResult.error || 'Unable to send OTP. Please try again.'
+        message: mailResult.error || 'Unable to send OTP. Please try again later.'
       });
     }
 
