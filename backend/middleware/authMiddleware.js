@@ -40,18 +40,19 @@ const protectWardenAllowlist = (req, res, next) => {
   }
 
   if (['staff', 'admin'].includes(req.user.role)) {
-    const uname = (req.user.username || '').trim().toLowerCase();
-    const staffId = (req.user.staffId || '').trim().toLowerCase();
-
-    if (!WARDEN_ALLOWLIST_USERNAMES.includes(uname) && !WARDEN_ALLOWLIST_USERNAMES.includes(staffId)) {
+    if (req.user.status === 'inactive') {
       return res.status(403).json({
         success: false,
-        message: '403 Forbidden: Access Denied. Only pre-authorized 4 Warden accounts are granted access.'
+        message: '403 Forbidden: Your Warden account is set to Inactive.'
       });
     }
+    return next();
   }
 
-  next();
+  return res.status(403).json({
+    success: false,
+    message: '403 Forbidden: Access Denied. Only Warden accounts are granted access.'
+  });
 };
 
 const protectFacultyAllowlist = (req, res, next) => {
@@ -60,18 +61,19 @@ const protectFacultyAllowlist = (req, res, next) => {
   }
 
   if (req.user.role === 'faculty') {
-    const uname = (req.user.username || '').trim().toLowerCase();
-    const staffId = (req.user.staffId || '').trim().toLowerCase();
-
-    if (!FACULTY_ALLOWLIST_USERNAMES.includes(uname) && !FACULTY_ALLOWLIST_USERNAMES.includes(staffId)) {
+    if (req.user.status === 'inactive') {
       return res.status(403).json({
         success: false,
-        message: '403 Forbidden: Access Denied. Only pre-authorized 24 Faculty Advisor accounts are granted access.'
+        message: '403 Forbidden: Your Faculty Advisor account is set to Inactive.'
       });
     }
+    return next();
   }
 
-  next();
+  return res.status(403).json({
+    success: false,
+    message: '403 Forbidden: Access Denied. Only Faculty Advisor accounts are granted access.'
+  });
 };
 
 module.exports = {

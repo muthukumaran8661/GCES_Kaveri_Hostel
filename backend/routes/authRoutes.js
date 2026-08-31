@@ -130,20 +130,6 @@ router.post('/login', async (req, res) => {
 
     const normalizedUsername = username.trim().toLowerCase();
 
-    if ((role === 'staff' || role === 'admin') && !WARDEN_ALLOWLIST_USERNAMES.includes(normalizedUsername)) {
-      return res.status(403).json({
-        success: false,
-        message: '403 Forbidden: Access Denied. Your Warden ID is not an authorized account.'
-      });
-    }
-
-    if (role === 'faculty' && !FACULTY_ALLOWLIST_USERNAMES.includes(normalizedUsername)) {
-      return res.status(403).json({
-        success: false,
-        message: '403 Forbidden: Access Denied. Your Faculty ID is not an authorized Faculty Advisor account.'
-      });
-    }
-
     if (role === 'student' && !/^8301[0-9]{8}$/.test(password)) {
       return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
     }
@@ -154,7 +140,14 @@ router.post('/login', async (req, res) => {
         success: false,
         message: role === 'student'
           ? 'No match. Check your Student ID, and remember the password is your Register No.'
-          : 'No matching account. Check your details or create an account.'
+          : 'No matching account. Check your details or contact Admin.'
+      });
+    }
+
+    if (user.status === 'inactive') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is currently set to Inactive. Please contact the Hostel Admin.'
       });
     }
 

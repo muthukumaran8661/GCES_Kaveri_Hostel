@@ -222,4 +222,176 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
   }
 });
 
+// @route   POST /api/users/add-staff
+// @desc    Admin endpoint to create a new Warden or Faculty Advisor account
+// @access  Private (Staff/Admin)
+router.post('/add-staff', protect, protectWardenAllowlist, async (req, res) => {
+  try {
+    if (!['staff', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied. Admin or Warden access required.' });
+    }
+
+    const { name, username, role, department, year, email, phone, password } = req.body;
+
+    // Validation 1: Required fields
+    if (!name || !name.trim() ||
+        !username || !username.trim() ||
+        !role || !role.trim() ||
+        !year || !year.trim() ||
+        !email || !email.trim() ||
+        !phone || !phone.trim() ||
+        !password || !password.trim()) {
+      return res.status(400).json({ success: false, message: 'All fields are required. Please fill in all details.' });
+    }
+
+    const normName = name.trim();
+    const normUsername = username.trim().toLowerCase();
+    const normRole = role.trim().toLowerCase();
+    const normYear = year.trim();
+    const normEmail = email.trim().toLowerCase();
+    const normPhone = phone.trim();
+    const rawPassword = password.trim();
+
+    // Validation 2: Role check
+    if (!['staff', 'faculty'].includes(normRole)) {
+      return res.status(400).json({ success: false, message: 'Role must be either "Warden" (staff) or "Faculty Advisor" (faculty).' });
+    }
+
+    // Role-based Department enforcement
+    let normDept = (department || '').trim();
+    if (normRole === 'staff') {
+      normDept = 'Hostel Administration';
+    } else {
+      if (!normDept) {
+        return res.status(400).json({ success: false, message: 'Department is required for Faculty Advisor.' });
+      }
+    }
+
+    // Validation 3: Email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normEmail)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid registered email address.' });
+    }
+
+    // Validation 4: Phone format (10 digits)
+    if (!/^[0-9]{10}$/.test(normPhone)) {
+      return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
+    }
+
+    // Validation 5: Unique Login ID (username/staffId)
+    const existingUser = await User.findOne({
+      $or: [
+        { username: normUsername },
+        { staffId: new RegExp('^' + normUsername + '$', 'i') }
+      ]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: `Login ID "${username.trim()}" is already registered. Please choose a unique Login ID.`
+      });
+    }
+
+    // Validation 6: Unique Email
+    const existingEmail = await User.findOne({ email: normEmail });
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: `Registered email "${normEmail}" is already associated with another account.`
+      });
+    }
+
+    // Calculate designation
+    const displayYear = normalizeYearDisplay(normYear);
+    let designation = '';
+    if (normRole === 'staff') {
+      designation = displayYear && displayYear !== 'All Years' ? `${displayYear} Warden` : 'Warden';
+    } else {
+      designation = displayYear && displayYear !== 'All Years' ? `${displayYear} ${normDept} Faculty Advisor` : `${normDept} Faculty Advisor`;
+    }
+
+    // Create new staff account (bcrypt hashing is automatically handled in User pre-save hook)
+    const newUser = await User.create({
+      name: normName,
+      username: normUsername,
+      staffId: normUsername,
+      role: normRole,
+      department: normDept,
+      year: normYear,
+      email: normEmail,
+      phone: normPhone,
+      password: rawPassword,
+      designation,
+      status: 'active'
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'New staff account added successfully.',
+      user: {
+        id: newUser._id,
+        _id: newUser._id,
+        name: newUser.name,
+        username: newUser.username,
+        staffId: newUser.staffId,
+        role: newUser.role,
+        department: newUser.department,
+        year: newUser.year,
+        email: newUser.email,
+        phone: newUser.phone,
+        designation: newUser.designation,
+        status: newUser.status
+      }
+    });
+  } catch (error) {
+    console.error('Add staff account error:', error);
+    return res.status(500).json({ success: false, message: 'Server error creating staff account.' });
+  }
+});
+
+// @route   DELETE /api/users/staff/:id or DELETE /api/users/:id
+// @desc    Admin endpoint to permanently delete a Warden or Faculty Advisor account
+// @access  Private (Staff/Admin)
+const deleteStaffHandler = async (req, res) => {
+  try {
+    if (!['staff', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied. Admin or Warden access required.' });
+    }
+
+    const targetUserId = req.params.id;
+
+    // Prevent self-deletion
+    if (req.user._id && req.user._id.toString() === targetUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Action prohibited: You cannot delete your own currently logged-in Admin account.'
+      });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'Staff account not found or already deleted.' });
+    }
+
+    if (!['staff', 'faculty', 'admin'].includes(targetUser.role)) {
+      return res.status(400).json({ success: false, message: 'Only Warden or Faculty Advisor accounts can be deleted.' });
+    }
+
+    // Permanently remove from database
+    await User.findByIdAndDelete(targetUserId);
+
+    return res.json({
+      success: true,
+      message: 'Staff account deleted successfully.'
+    });
+  } catch (error) {
+    console.error('Delete staff account error:', error);
+    return res.status(500).json({ success: false, message: 'Server error deleting staff account.' });
+  }
+};
+
+router.delete('/staff/:id', protect, protectWardenAllowlist, deleteStaffHandler);
+router.delete('/:id', protect, protectWardenAllowlist, deleteStaffHandler);
+
 module.exports = router;
