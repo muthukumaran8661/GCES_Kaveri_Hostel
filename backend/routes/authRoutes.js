@@ -224,61 +224,78 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // @route   POST /api/auth/warden/forgot-password
-// @desc    Initiate password reset for Warden account via email
+// @desc    Initiate password reset for Warden account via exact Warden ID + Email
 // @access  Public
 router.post('/warden/forgot-password', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { staffId, wardenId, username, email } = req.body;
+    const inputWardenId = (staffId || wardenId || username || '').trim();
+    const inputEmail = (email || '').trim().toLowerCase();
 
-    if (!email || !email.trim()) {
+    if (!inputWardenId) {
+      return res.status(400).json({ success: false, message: 'Please enter your Warden ID.' });
+    }
+
+    if (!inputEmail) {
       return res.status(400).json({ success: false, message: 'Please enter your registered email address.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanWardenId = inputWardenId.toLowerCase();
 
-    // Verify that the email matches a registered Warden account
+    // 1. Verify Warden ID exists in active Warden accounts
     const wardenUser = await User.findOne({
-      email: cleanEmail,
+      $or: [
+        { username: cleanWardenId },
+        { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+      ],
       role: { $in: ['staff', 'admin'] }
     });
 
     if (!wardenUser) {
       return res.status(404).json({
         success: false,
-        message: 'No registered Warden account found with this email address.'
+        message: 'Invalid Warden ID.'
       });
     }
 
-    // Generate 6-digit OTP
+    // 2. Verify registered Email matches this exact Warden ID
+    const registeredEmail = (wardenUser.email || '').trim().toLowerCase();
+    if (!registeredEmail || registeredEmail !== inputEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid registered email for this Warden ID.'
+      });
+    }
+
+    // 3. Generate secure 6-digit OTP (expires in 5 minutes)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     wardenUser.resetOtp = otp;
-    wardenUser.resetOtpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+    wardenUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
 
     await wardenUser.save();
 
-    // Send Email
+    // 4. Send Email to the exact registered email address
     await sendEmail({
       to: wardenUser.email,
       subject: 'GCES Kaveri Hostel - Warden Password Reset OTP',
-      text: `Hello ${wardenUser.name || 'Warden'},\n\nYour OTP for password reset is: ${otp}\nThis OTP is valid for 10 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
+      text: `Hello ${wardenUser.name || 'Warden'},\n\nYour OTP for password reset (Warden ID: ${wardenUser.staffId || wardenUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #2A2140; max-width: 500px; margin: 0 auto; border: 1px solid #EAD9BE; border-radius: 12px; background-color: #FBF6EC;">
           <h2 style="color: #9E1B32; margin-top: 0;">GCES Kaveri Hostel Admin</h2>
-          <p style="font-size: 14px;">Hello <strong>${wardenUser.name || 'Warden'}</strong>,</p>
+          <p style="font-size: 14px;">Hello <strong>${wardenUser.name || 'Warden'}</strong> (${wardenUser.staffId || wardenUser.username}),</p>
           <p style="font-size: 14px;">Your OTP for resetting your Warden account password is:</p>
           <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #127A6E; padding: 12px 20px; background: #EAF6F4; display: inline-block; border-radius: 8px; margin: 12px 0; border: 1px solid #127A6E;">${otp}</div>
-          <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 10 minutes.</p>
+          <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 5 minutes.</p>
           <hr style="border: none; border-top: 1px solid #EAD9BE; margin: 20px 0;" />
           <p style="font-size: 11px; color: #7A7290;">If you did not request a password reset, please ignore this message.</p>
         </div>
       `
     });
 
+    // Return success message without revealing OTP
     return res.json({
       success: true,
-      message: `Password reset OTP sent to ${wardenUser.email}.`,
-      email: wardenUser.email,
-      otpPreview: otp
+      message: 'OTP has been sent to your registered email address.'
     });
   } catch (error) {
     console.error('Warden forgot-password error:', error);
@@ -291,22 +308,28 @@ router.post('/warden/forgot-password', async (req, res) => {
 // @access  Public
 router.post('/warden/verify-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { staffId, wardenId, username, email, otp } = req.body;
+    const inputWardenId = (staffId || wardenId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
 
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and OTP are required.' });
+    if (!inputWardenId || !cleanEmail || !cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Warden ID, Email, and OTP are required.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = otp.trim();
+    const cleanWardenId = inputWardenId.toLowerCase();
 
     const wardenUser = await User.findOne({
+      $or: [
+        { username: cleanWardenId },
+        { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+      ],
       email: cleanEmail,
       role: { $in: ['staff', 'admin'] }
     });
 
     if (!wardenUser) {
-      return res.status(404).json({ success: false, message: 'Warden account not found.' });
+      return res.status(404).json({ success: false, message: 'Invalid Warden ID or Email.' });
     }
 
     if (!wardenUser.resetOtp || wardenUser.resetOtp !== cleanOtp) {
@@ -328,24 +351,30 @@ router.post('/warden/verify-otp', async (req, res) => {
 });
 
 // @route   POST /api/auth/warden/reset-password
-// @desc    Set new password after OTP verification for Warden
+// @desc    Set new password after OTP verification for specific Warden ID
 // @access  Public
 router.post('/warden/reset-password', async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { staffId, wardenId, username, email, otp, newPassword } = req.body;
+    const inputWardenId = (staffId || wardenId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
 
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required.' });
+    if (!inputWardenId || !cleanEmail || !cleanOtp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Warden ID, Email, OTP, and new password are required.' });
     }
 
     if (newPassword.length < 4) {
       return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = otp.trim();
+    const cleanWardenId = inputWardenId.toLowerCase();
 
     const wardenUser = await User.findOne({
+      $or: [
+        { username: cleanWardenId },
+        { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+      ],
       email: cleanEmail,
       role: { $in: ['staff', 'admin'] }
     });
@@ -362,7 +391,7 @@ router.post('/warden/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
     }
 
-    // Update password (pre-save hook hashes password using bcrypt)
+    // Update password for ONLY this Warden account (pre-save hook hashes password using bcrypt)
     wardenUser.password = newPassword;
     wardenUser.resetOtp = '';
     wardenUser.resetOtpExpire = null;
@@ -380,4 +409,5 @@ router.post('/warden/reset-password', async (req, res) => {
 });
 
 module.exports = router;
+
 

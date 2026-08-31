@@ -548,55 +548,72 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       <WardenForgotPasswordModal
         isOpen={showWardenResetModal}
         onClose={() => setShowWardenResetModal(false)}
+        initialWardenId={staffId}
       />
     </div>
   );
 }
 
-function WardenForgotPasswordModal({ isOpen, onClose }) {
+function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
   const [step, setStep] = useState('email'); // 'email' | 'otp' | 'password' | 'success'
+  const [wardenId, setWardenId] = useState(initialWardenId);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [otpPreview, setOtpPreview] = useState('');
+
+  useEffect(() => {
+    if (isOpen && initialWardenId) {
+      setWardenId(initialWardenId);
+    }
+  }, [isOpen, initialWardenId]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setStep('email');
+    setWardenId('');
     setEmail('');
     setOtp('');
     setNewPassword('');
     setConfirmPassword('');
     setError('');
-    setOtpPreview('');
+    setInfoMsg('');
     onClose();
   };
 
   const handleSendEmail = async (e) => {
     if (e) e.preventDefault();
     setError('');
+    setInfoMsg('');
+
+    if (!wardenId.trim()) {
+      setError('Please enter your Warden ID.');
+      return;
+    }
     if (!email.trim()) {
       setError('Please enter your registered email address.');
       return;
     }
+
     setLoading(true);
     try {
       const res = await fetch('/api/auth/warden/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() })
+        body: JSON.stringify({
+          staffId: wardenId.trim(),
+          email: email.trim()
+        })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to send OTP.');
       }
-      if (data.otpPreview) {
-        setOtpPreview(data.otpPreview);
-      }
+      setInfoMsg(data.message || 'OTP has been sent to your registered email address.');
       setStep('otp');
     } catch (err) {
       setError(err.message);
@@ -617,13 +634,18 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
       const res = await fetch('/api/auth/warden/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), otp: otp.trim() })
+        body: JSON.stringify({
+          staffId: wardenId.trim(),
+          email: email.trim(),
+          otp: otp.trim()
+        })
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Invalid OTP code.');
       }
       setError('');
+      setInfoMsg('');
       setStep('password');
     } catch (err) {
       setError(err.message);
@@ -653,6 +675,7 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          staffId: wardenId.trim(),
           email: email.trim(),
           otp: otp.trim(),
           newPassword: newPassword.trim()
@@ -678,29 +701,43 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
         </button>
 
         <div className="gkof-modal-header">
-          <div className="gkof-modal-badge">🛡️ Warden Recovery</div>
+          <div className="gkof-modal-badge">🛡️ Warden Security</div>
           <h2>Warden Password Reset</h2>
         </div>
 
         {error && <div className="gkof-auth-error show" style={{ marginBottom: '16px' }}>{error}</div>}
+        {infoMsg && step === 'otp' && (
+          <div className="gkof-note" style={{ marginBottom: '16px', background: '#DCF3EA', borderColor: '#2E8B57', color: '#127A6E', fontWeight: 600 }}>
+            ✉️ {infoMsg}
+          </div>
+        )}
 
         {step === 'email' && (
           <form onSubmit={handleSendEmail}>
             <p className="gkof-modal-desc">
-              Enter your registered Warden email address to receive a 6-digit verification OTP.
+              Enter your Warden ID and its exact registered email address to receive a 6-digit verification OTP.
             </p>
             <div className="gkof-field">
-              <label>Registered Email</label>
+              <label>Warden ID</label>
               <input
-                type="email"
-                placeholder="e.g. muthuwarden@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="e.g. Rajesh@123"
+                value={wardenId}
+                onChange={(e) => setWardenId(e.target.value)}
                 autoFocus
               />
             </div>
+            <div className="gkof-field">
+              <label>Registered Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. rajeshwarden30@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
             <button className="gkof-btn wide teal" type="submit" disabled={loading}>
-              {loading ? 'Verifying & Sending OTP...' : 'Send OTP'}
+              {loading ? 'Validating & Sending OTP...' : 'Send OTP'}
             </button>
           </form>
         )}
@@ -708,13 +745,8 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
         {step === 'otp' && (
           <form onSubmit={handleVerifyOtp}>
             <p className="gkof-modal-desc">
-              Enter the 6-digit OTP code sent to <strong>{email}</strong>.
+              Enter the 6-digit OTP code sent to your email. (OTP expires in 5 minutes).
             </p>
-            {otpPreview && (
-              <div className="gkof-note" style={{ marginBottom: '14px', background: '#EAF6F4', borderColor: '#127A6E', color: '#127A6E' }}>
-                🔑 <strong>OTP Code:</strong> {otpPreview}
-              </div>
-            )}
             <div className="gkof-field">
               <label>6-Digit OTP</label>
               <input
@@ -739,7 +771,7 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
         {step === 'password' && (
           <form onSubmit={handleResetPassword}>
             <p className="gkof-modal-desc">
-              OTP verified! Enter and confirm your new password below.
+              OTP verified! Enter and confirm a new password for Warden ID <strong>{wardenId}</strong>.
             </p>
             <div className="gkof-field">
               <label>New Password</label>
@@ -770,7 +802,7 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
               Password Updated Successfully!
             </h3>
             <p className="gkof-modal-desc" style={{ marginBottom: '20px' }}>
-              Your Warden password has been reset. You can now log in with your new password.
+              The password for Warden account <strong>{wardenId}</strong> has been updated. You can now log in with your new credentials.
             </p>
             <button className="gkof-btn wide maroon" onClick={handleClose}>
               Back to Warden Login
@@ -781,4 +813,5 @@ function WardenForgotPasswordModal({ isOpen, onClose }) {
     </div>
   );
 }
+
 
