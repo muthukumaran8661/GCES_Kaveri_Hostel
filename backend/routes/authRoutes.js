@@ -415,6 +415,257 @@ router.post('/warden/reset-password', async (req, res) => {
   }
 });
 
+// =====================================================================
+// FACULTY ADVISOR PASSWORD RESET ROUTES
+// =====================================================================
+
+// @route   POST /api/auth/faculty/forgot-password
+// @desc    Initiate password reset for Faculty Advisor account via exact Faculty ID + Email
+// @access  Public
+router.post('/faculty/forgot-password', async (req, res) => {
+  try {
+    const { staffId, facultyId, username, email } = req.body;
+    const inputFacultyId = (staffId || facultyId || username || '').trim();
+    const inputEmail = (email || '').trim().toLowerCase();
+
+    if (!inputFacultyId) {
+      return res.status(400).json({ success: false, message: 'Please enter your Faculty Advisor ID.' });
+    }
+
+    if (!inputEmail) {
+      return res.status(400).json({ success: false, message: 'Please enter your registered email address.' });
+    }
+
+    const cleanFacultyId = inputFacultyId.toLowerCase();
+
+    // 1. Verify Faculty Advisor ID exists in active Faculty accounts
+    const facultyUser = await User.findOne({
+      $or: [
+        { username: cleanFacultyId },
+        { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+      ],
+      role: 'faculty'
+    });
+
+    if (!facultyUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid Faculty Advisor ID.'
+      });
+    }
+
+    // 2. Verify registered Email matches this exact Faculty Advisor ID
+    const registeredEmail = (facultyUser.email || '').trim().toLowerCase();
+    if (!registeredEmail || registeredEmail !== inputEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid registered email for this Faculty Advisor ID.'
+      });
+    }
+
+    // 3. Generate secure 6-digit OTP (expires in 5 minutes)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 4. Send Email to the exact registered email address FIRST
+    const mailResult = await sendEmail({
+      to: facultyUser.email,
+      subject: 'GCES Kaveri Hostel - Faculty Advisor Password Reset OTP',
+      text: `Hello ${facultyUser.name || 'Faculty Advisor'},\n\nYour OTP for password reset (Faculty Advisor ID: ${facultyUser.staffId || facultyUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #2A2140; max-width: 500px; margin: 0 auto; border: 1px solid #EAD9BE; border-radius: 12px; background-color: #FBF6EC;">
+          <h2 style="color: #9E1B32; margin-top: 0;">GCES Kaveri Hostel Admin</h2>
+          <p style="font-size: 14px;">Hello <strong>${facultyUser.name || 'Faculty Advisor'}</strong> (${facultyUser.staffId || facultyUser.username}),</p>
+          <p style="font-size: 14px;">Your OTP for resetting your Faculty Advisor account password is:</p>
+          <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #127A6E; padding: 12px 20px; background: #EAF6F4; display: inline-block; border-radius: 8px; margin: 12px 0; border: 1px solid #127A6E;">${otp}</div>
+          <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 5 minutes.</p>
+          <hr style="border: none; border-top: 1px solid #EAD9BE; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #7A7290;">If you did not request a password reset, please ignore this message.</p>
+        </div>
+      `
+    });
+
+    if (!mailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: mailResult.error || 'Unable to send OTP. Please try again later.'
+      });
+    }
+
+    // Save OTP to DB ONLY after real email dispatch succeeds
+    facultyUser.resetOtp = otp;
+    facultyUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+    await facultyUser.save();
+
+    return res.json({
+      success: true,
+      message: 'OTP has been sent to your registered email address.'
+    });
+  } catch (error) {
+    console.error('Faculty forgot-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error processing password reset request.' });
+  }
+});
+
+// @route   POST /api/auth/faculty/verify-otp
+// @desc    Verify OTP for Faculty Advisor password reset
+// @access  Public
+router.post('/faculty/verify-otp', async (req, res) => {
+  try {
+    const { staffId, facultyId, username, email, otp } = req.body;
+    const inputFacultyId = (staffId || facultyId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!inputFacultyId || !cleanEmail || !cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Faculty Advisor ID, Email, and OTP are required.' });
+    }
+
+    const cleanFacultyId = inputFacultyId.toLowerCase();
+
+    const facultyUser = await User.findOne({
+      $or: [
+        { username: cleanFacultyId },
+        { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+      ],
+      email: cleanEmail,
+      role: 'faculty'
+    });
+
+    if (!facultyUser) {
+      return res.status(404).json({ success: false, message: 'Invalid Faculty Advisor ID or Email.' });
+    }
+
+    if (!facultyUser.resetOtp || facultyUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Please check and try again.' });
+    }
+
+    if (!facultyUser.resetOtpExpire || facultyUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'OTP verified successfully.'
+    });
+  } catch (error) {
+    console.error('Faculty verify-otp error:', error);
+    return res.status(500).json({ success: false, message: 'Server error verifying OTP.' });
+  }
+});
+
+// @route   POST /api/auth/faculty/reset-password
+// @desc    Set new password after OTP verification for specific Faculty Advisor ID
+// @access  Public
+router.post('/api/auth/faculty/reset-password', async (req, res) => {
+  try {
+    const { staffId, facultyId, username, email, otp, newPassword } = req.body;
+    const inputFacultyId = (staffId || facultyId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!inputFacultyId || !cleanEmail || !cleanOtp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Faculty Advisor ID, Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const cleanFacultyId = inputFacultyId.toLowerCase();
+
+    const facultyUser = await User.findOne({
+      $or: [
+        { username: cleanFacultyId },
+        { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+      ],
+      email: cleanEmail,
+      role: 'faculty'
+    });
+
+    if (!facultyUser) {
+      return res.status(404).json({ success: false, message: 'Faculty Advisor account not found.' });
+    }
+
+    if (!facultyUser.resetOtp || facultyUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Password reset aborted.' });
+    }
+
+    if (!facultyUser.resetOtpExpire || facultyUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
+    }
+
+    // Update password for ONLY this Faculty Advisor account (pre-save hook hashes password using bcrypt)
+    facultyUser.password = newPassword;
+    facultyUser.resetOtp = '';
+    facultyUser.resetOtpExpire = null;
+
+    await facultyUser.save();
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully.'
+    });
+  } catch (error) {
+    console.error('Faculty reset-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating password.' });
+  }
+});
+
+// Also register route without prefix for safety
+router.post('/faculty/reset-password', async (req, res) => {
+  try {
+    const { staffId, facultyId, username, email, otp, newPassword } = req.body;
+    const inputFacultyId = (staffId || facultyId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!inputFacultyId || !cleanEmail || !cleanOtp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Faculty Advisor ID, Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const cleanFacultyId = inputFacultyId.toLowerCase();
+
+    const facultyUser = await User.findOne({
+      $or: [
+        { username: cleanFacultyId },
+        { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+      ],
+      email: cleanEmail,
+      role: 'faculty'
+    });
+
+    if (!facultyUser) {
+      return res.status(404).json({ success: false, message: 'Faculty Advisor account not found.' });
+    }
+
+    if (!facultyUser.resetOtp || facultyUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Password reset aborted.' });
+    }
+
+    if (!facultyUser.resetOtpExpire || facultyUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
+    }
+
+    facultyUser.password = newPassword;
+    facultyUser.resetOtp = '';
+    facultyUser.resetOtpExpire = null;
+
+    await facultyUser.save();
+
+    return res.json({
+      success: true,
+      message: 'Password reset successfully.'
+    });
+  } catch (error) {
+    console.error('Faculty reset-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating password.' });
+  }
+});
+
 module.exports = router;
 
 

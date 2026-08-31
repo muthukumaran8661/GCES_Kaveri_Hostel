@@ -1,8 +1,15 @@
 const nodemailer = require('nodemailer');
 
+function getCleanEnv(key, defaultVal = '') {
+  const val = process.env[key] || defaultVal;
+  return String(val).trim().replace(/^["']|["']$/g, '');
+}
+
 async function sendEmail({ to, subject, text, html }) {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
+  const smtpUser = getCleanEnv('SMTP_USER') || getCleanEnv('EMAIL_USER');
+  const smtpPass = getCleanEnv('SMTP_PASS') || getCleanEnv('EMAIL_PASS');
+  const smtpHost = getCleanEnv('SMTP_HOST', 'smtp.gmail.com');
+  const smtpPort = Number(getCleanEnv('SMTP_PORT', '587'));
 
   if (!smtpUser || !smtpPass) {
     console.error('[Mailer Error] Missing SMTP_USER or SMTP_PASS environment variables.');
@@ -13,8 +20,8 @@ async function sendEmail({ to, subject, text, html }) {
   }
 
   const transporterConfig = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 587),
+    host: smtpHost || 'smtp.gmail.com',
+    port: isNaN(smtpPort) ? 587 : smtpPort,
     secure: false,
     auth: {
       user: smtpUser,
@@ -36,16 +43,18 @@ async function sendEmail({ to, subject, text, html }) {
       html
     });
 
-    console.log(`[Mailer] OTP email successfully sent to ${to} (Message ID: ${info.messageId})`);
+    console.log(`[Mailer] OTP email successfully sent to ${to} via ${smtpUser} (Message ID: ${info.messageId})`);
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`[Mailer Error] Failed to send email to ${to}:`, err.message);
+    console.error(`[Mailer Error] Failed to send email to ${to}:`, err);
 
     let userFriendlyError = 'Unable to send OTP. Please try again later.';
     if (err.code === 'EAUTH' || err.responseCode === 535) {
-      userFriendlyError = 'SMTP Authentication failed. Please check the Gmail address and 16-character App Password in Render settings.';
+      userFriendlyError = 'SMTP Authentication failed. Please check the Gmail address (SMTP_USER) and 16-character App Password (SMTP_PASS) in Render environment settings.';
     } else if (err.code === 'ESOCKET' || err.code === 'ETIMEDOUT') {
       userFriendlyError = 'Email server connection timed out. Please try again later.';
+    } else if (err.message) {
+      userFriendlyError = `Unable to send OTP: ${err.message}`;
     }
 
     return {

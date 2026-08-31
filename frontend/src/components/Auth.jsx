@@ -54,6 +54,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [role, setRole] = useState('student'); // 'student' | 'staff'
   const [showWardenResetModal, setShowWardenResetModal] = useState(false);
+  const [showFacultyResetModal, setShowFacultyResetModal] = useState(false);
 
   // Form states
 
@@ -273,7 +274,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       onChange={(e) => setStaffId(e.target.value)}
                     />
                   </div>
-                  <div className="gkof-field" style={{ marginBottom: role === 'staff' ? '6px' : '16px' }}>
+                  <div className="gkof-field" style={{ marginBottom: (role === 'staff' || role === 'faculty') ? '6px' : '16px' }}>
                     <label>Password</label>
                     <PasswordInput
                       placeholder="••••••••"
@@ -281,12 +282,15 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       onChange={(e) => setStaffPass(e.target.value)}
                     />
                   </div>
-                  {role === 'staff' && (
+                  {(role === 'staff' || role === 'faculty') && (
                     <div className="gkof-forgot-wrap">
                       <button
                         type="button"
                         className="gkof-forgot-link"
-                        onClick={() => setShowWardenResetModal(true)}
+                        onClick={() => {
+                          if (role === 'staff') setShowWardenResetModal(true);
+                          else if (role === 'faculty') setShowFacultyResetModal(true);
+                        }}
                       >
                         Forgot Password?
                       </button>
@@ -549,6 +553,11 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         isOpen={showWardenResetModal}
         onClose={() => setShowWardenResetModal(false)}
         initialWardenId={staffId}
+      />
+      <FacultyForgotPasswordModal
+        isOpen={showFacultyResetModal}
+        onClose={() => setShowFacultyResetModal(false)}
+        initialFacultyId={staffId}
       />
     </div>
   );
@@ -813,5 +822,269 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
     </div>
   );
 }
+
+function FacultyForgotPasswordModal({ isOpen, onClose, initialFacultyId = '' }) {
+  const [step, setStep] = useState('email'); // 'email' | 'otp' | 'password' | 'success'
+  const [facultyId, setFacultyId] = useState(initialFacultyId);
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialFacultyId) {
+      setFacultyId(initialFacultyId);
+    }
+  }, [isOpen, initialFacultyId]);
+
+  if (!isOpen) return null;
+
+  const handleClose = () => {
+    setStep('email');
+    setFacultyId('');
+    setEmail('');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+    setInfoMsg('');
+    onClose();
+  };
+
+  const handleSendEmail = async (e) => {
+    if (e) e.preventDefault();
+    setError('');
+    setInfoMsg('');
+
+    if (!facultyId.trim()) {
+      setError('Please enter your Faculty Advisor ID.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your registered email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/faculty/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffId: facultyId.trim(),
+          facultyId: facultyId.trim(),
+          email: email.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to send OTP.');
+      }
+      setInfoMsg(data.message || 'OTP has been sent to your registered email address.');
+      setStep('otp');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!otp.trim()) {
+      setError('Please enter the 6-digit OTP code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/faculty/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffId: facultyId.trim(),
+          facultyId: facultyId.trim(),
+          email: email.trim(),
+          otp: otp.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Invalid OTP code.');
+      }
+      setError('');
+      setInfoMsg('');
+      setStep('password');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!newPassword.trim()) {
+      setError('Please enter a new password.');
+      return;
+    }
+    if (newPassword.trim().length < 4) {
+      setError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please confirm your new password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/faculty/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staffId: facultyId.trim(),
+          facultyId: facultyId.trim(),
+          email: email.trim(),
+          otp: otp.trim(),
+          newPassword: newPassword.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to reset password.');
+      }
+      setStep('success');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="gkof-modal-overlay" onClick={handleClose}>
+      <div className="gkof-modal-box" onClick={(e) => e.stopPropagation()}>
+        <button className="gkof-modal-close" onClick={handleClose} aria-label="Close">
+          ✕
+        </button>
+
+        <div className="gkof-modal-header">
+          <div className="gkof-modal-badge">👨‍🏫 Faculty Security</div>
+          <h2>Faculty Advisor Password Reset</h2>
+        </div>
+
+        {error && <div className="gkof-auth-error show" style={{ marginBottom: '16px' }}>{error}</div>}
+        {infoMsg && step === 'otp' && (
+          <div className="gkof-note" style={{ marginBottom: '16px', background: '#DCF3EA', borderColor: '#2E8B57', color: '#127A6E', fontWeight: 600 }}>
+            ✉️ {infoMsg}
+          </div>
+        )}
+
+        {step === 'email' && (
+          <form onSubmit={handleSendEmail}>
+            <p className="gkof-modal-desc">
+              Enter your Faculty Advisor ID and its exact registered email address to receive a 6-digit verification OTP.
+            </p>
+            <div className="gkof-field">
+              <label>Faculty Advisor ID</label>
+              <input
+                type="text"
+                placeholder="e.g. ArunKumar@123"
+                value={facultyId}
+                onChange={(e) => setFacultyId(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="gkof-field">
+              <label>Registered Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. arunkumarfaculty@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Validating & Sending OTP...' : 'Send OTP'}
+            </button>
+          </form>
+        )}
+
+        {step === 'otp' && (
+          <form onSubmit={handleVerifyOtp}>
+            <p className="gkof-modal-desc">
+              Enter the 6-digit OTP code sent to your email. (OTP expires in 5 minutes).
+            </p>
+            <div className="gkof-field">
+              <label>6-Digit OTP</label>
+              <input
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                style={{ letterSpacing: '4px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center' }}
+                autoFocus
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Verifying OTP...' : 'Verify OTP'}
+            </button>
+            <div className="gkof-switch" style={{ marginTop: '12px' }}>
+              Didn't receive code? <a onClick={() => handleSendEmail()}>Resend OTP</a>
+            </div>
+          </form>
+        )}
+
+        {step === 'password' && (
+          <form onSubmit={handleResetPassword}>
+            <p className="gkof-modal-desc">
+              OTP verified! Enter and confirm a new password for Faculty Advisor ID <strong>{facultyId}</strong>.
+            </p>
+            <div className="gkof-field">
+              <label>New Password</label>
+              <PasswordInput
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="gkof-field">
+              <label>Confirm New Password</label>
+              <PasswordInput
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Updating Password...' : 'Update Password'}
+            </button>
+          </form>
+        )}
+
+        {step === 'success' && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+            <h3 style={{ margin: '0 0 8px', color: 'var(--teal)', fontSize: '18px' }}>
+              Password Reset Successfully!
+            </h3>
+            <p className="gkof-modal-desc" style={{ marginBottom: '20px' }}>
+              The password for Faculty Advisor account <strong>{facultyId}</strong> has been updated. You can now log in with your new credentials.
+            </p>
+            <button className="gkof-btn wide maroon" onClick={handleClose}>
+              Back to Faculty Advisor Login
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 
