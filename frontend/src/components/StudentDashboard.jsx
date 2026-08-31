@@ -85,10 +85,17 @@ export default function StudentDashboard({
   onNavigateTab
 }) {
   const mine = requests.slice().reverse();
+  const mineHistory = mine.filter(r =>
+    (r.status === 'approved_final' || r.status === 'returned' || r.qrStatus === 'OUT') &&
+    (r.qrToken || r.status === 'approved_final' || r.status === 'returned')
+  );
   const total = mine.length;
+  const historyTotal = mineHistory.length;
   const pending = mine.filter(r => ['pending_staff', 'notifying_parent', 'pending_faculty'].includes(r.status)).length;
-  const out = mine.filter(r => r.status === 'approved_final').length;
+  const out = mine.filter(r => r.status === 'approved_final' || r.qrStatus === 'OUT').length;
   const returned = mine.filter(r => r.status === 'returned').length;
+
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
 
   const hasSavedHome = !!session.homeAddress;
 
@@ -97,6 +104,22 @@ export default function StudentDashboard({
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const fmtDateShort = (d) => {
+    if (!d) return '—';
+    if (typeof d === 'string' && d.includes('T')) {
+      const parts = d.split('T');
+      const dateParts = parts[0].split('-');
+      if (dateParts.length === 3) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const mIdx = parseInt(dateParts[1], 10) - 1;
+        return `${dateParts[2]} ${months[mIdx] || dateParts[1]} ${dateParts[0]}`;
+      }
+    }
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return String(d);
+    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const todayDateStr = getLocalDateString();
@@ -457,17 +480,17 @@ export default function StudentDashboard({
     }
   };
 
-  // Dedicated Student History Page view
+  // Dedicated Student History Page view (ONLY Outpass Ready / QR-generated records)
   if (activeTab === 'history') {
     return (
       <>
-        {/* Separate History Page Banner */}
+        {/* Dedicated History Page Header Banner */}
         <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '18px', color: '#FFF' }}>📜 Outpass History</h2>
               <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--gold-soft)' }}>
-                View all your out pass requests ({total} records) including completed, ready, currently out, returned, and declined records.
+                View your approved "Outpass Ready" records with official QR codes ({historyTotal} record{historyTotal !== 1 ? 's' : ''}).
               </p>
             </div>
             {onNavigateTab && (
@@ -482,22 +505,74 @@ export default function StudentDashboard({
           </div>
         </div>
 
-        {/* Completed History List */}
+        {/* History Records List (Button / Card style entries) */}
         <div className="gkof-card">
-          <h3>Outpass History <span className="count">{total}</span></h3>
-          <div>
-            {mine.length ? (
-              mine.map(r => (
-                <TicketCard
-                  key={r.requestId || r.id || r._id}
-                  request={r}
-                  viewer="student"
-                  onAction={onAction}
-                  onShareLocation={onShareLocation}
-                />
-              ))
+          <h3>
+            Outpass Ready History <span className="count">{historyTotal}</span>
+          </h3>
+          <div style={{ marginTop: '14px' }}>
+            {mineHistory.length ? (
+              mineHistory.map(r => {
+                const displayId = r.requestId || r.id || r._id;
+                const isExpanded = expandedHistoryId === displayId;
+                const dateFormatted = fmtDateShort(r.fromDate);
+
+                return (
+                  <div key={displayId} style={{ marginBottom: '14px' }}>
+                    {/* Clickable Card Header Button */}
+                    <div
+                      onClick={() => setExpandedHistoryId(isExpanded ? null : displayId)}
+                      style={{
+                        background: '#FFFFFF',
+                        border: '1.5px solid var(--line)',
+                        borderRadius: isExpanded ? '12px 12px 0 0' : '12px',
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 6px rgba(158,27,50,0.06)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '22px' }}>📄</span>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--maroon-dark)', fontFamily: 'Roboto Slab, serif' }}>
+                            📄 Outpass – {dateFormatted} – <span style={{ color: 'var(--teal)', fontWeight: 800 }}>OUTPASS READY</span>
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: 'var(--ink-soft)', marginTop: '2px', fontFamily: 'IBM Plex Mono, monospace' }}>
+                            ID: {displayId} · Destination: {r.dest} · Travel: {r.travel}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="gkof-status approved">Outpass Ready</span>
+                        <span style={{ fontSize: '12.5px', color: 'var(--maroon)', fontWeight: 700 }}>
+                          {isExpanded ? '▲ Hide Details' : '▼ View Pass & QR'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Expanded Full Ticket Card */}
+                    {isExpanded && (
+                      <div style={{ borderTop: 'none', borderRadius: '0 0 12px 12px' }}>
+                        <TicketCard
+                          request={r}
+                          viewer="student"
+                          onAction={onAction}
+                          onShareLocation={onShareLocation}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
-              <div className="gkof-empty">No out pass requests submitted yet.</div>
+              <div className="gkof-empty">
+                No "Outpass Ready" or QR-generated records available in History yet.<br />
+                Submitted requests will automatically appear here once approved by Warden and QR code is generated.
+              </div>
             )}
           </div>
         </div>
@@ -680,14 +755,14 @@ export default function StudentDashboard({
 
       <div className="gkof-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <h3 style={{ margin: 0 }}>📋 My Out Pass Request History <span className="count">{total}</span></h3>
+          <h3 style={{ margin: 0 }}>📋 Current &amp; Active Requests <span className="count">{total}</span></h3>
           {onNavigateTab && (
             <button
               className="gkof-btn maroon"
               style={{ padding: '6px 12px', fontSize: '11.5px' }}
               onClick={() => onNavigateTab('history')}
             >
-              📜 Open Full History Page ({total})
+              📜 Open Outpass Ready History ({historyTotal})
             </button>
           )}
         </div>
