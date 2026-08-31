@@ -269,13 +269,9 @@ router.post('/warden/forgot-password', async (req, res) => {
 
     // 3. Generate secure 6-digit OTP (expires in 5 minutes)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    wardenUser.resetOtp = otp;
-    wardenUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
 
-    await wardenUser.save();
-
-    // 4. Send Email to the exact registered email address
-    await sendEmail({
+    // 4. Send Email to the exact registered email address FIRST
+    const mailResult = await sendEmail({
       to: wardenUser.email,
       subject: 'GCES Kaveri Hostel - Warden Password Reset OTP',
       text: `Hello ${wardenUser.name || 'Warden'},\n\nYour OTP for password reset (Warden ID: ${wardenUser.staffId || wardenUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
@@ -292,7 +288,18 @@ router.post('/warden/forgot-password', async (req, res) => {
       `
     });
 
-    // Return success message without revealing OTP
+    if (!mailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: mailResult.error || 'Unable to send OTP. Please try again.'
+      });
+    }
+
+    // Save OTP to DB ONLY after real email dispatch succeeds
+    wardenUser.resetOtp = otp;
+    wardenUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+    await wardenUser.save();
+
     return res.json({
       success: true,
       message: 'OTP has been sent to your registered email address.'
