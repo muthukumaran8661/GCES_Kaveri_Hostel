@@ -55,6 +55,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [role, setRole] = useState('student'); // 'student' | 'staff'
   const [showWardenResetModal, setShowWardenResetModal] = useState(false);
   const [showFacultyResetModal, setShowFacultyResetModal] = useState(false);
+  const [showStudentResetModal, setShowStudentResetModal] = useState(false);
 
   // Form states
 
@@ -253,7 +254,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       onChange={(e) => setStudentId(e.target.value)}
                     />
                   </div>
-                  <div className="gkof-field">
+                  <div className="gkof-field" style={{ marginBottom: '6px' }}>
                     <label>Password (your Register No.)</label>
                     <PasswordInput
                       placeholder="8301XXXXXXXX"
@@ -262,6 +263,15 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       value={regNo}
                       onChange={(e) => handleRegChange(e.target.value)}
                     />
+                  </div>
+                  <div className="gkof-forgot-wrap">
+                    <button
+                      type="button"
+                      className="gkof-forgot-link"
+                      onClick={() => setShowStudentResetModal(true)}
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
                 </>
               ) : (
@@ -559,6 +569,11 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         onClose={() => setShowFacultyResetModal(false)}
         initialFacultyId={staffId}
       />
+      <StudentForgotPasswordModal
+        isOpen={showStudentResetModal}
+        onClose={() => setShowStudentResetModal(false)}
+        initialStudentId={studentId}
+      />
     </div>
   );
 }
@@ -818,6 +833,246 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
             </p>
             <button className="gkof-btn wide maroon" onClick={handleClose}>
               Back to Warden Login
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) {
+  const [step, setStep] = useState('email'); // 'email' | 'otp' | 'password' | 'success'
+  const [studentId, setStudentId] = useState(initialStudentId);
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialStudentId) {
+      setStudentId(initialStudentId);
+    }
+  }, [isOpen, initialStudentId]);
+
+  if (!isOpen) return null;
+
+  const handleClose = () => {
+    setStep('email');
+    setStudentId('');
+    setEmail('');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+    setInfoMsg('');
+    onClose();
+  };
+
+  const handleSendEmail = async (e) => {
+    if (e) e.preventDefault();
+    setError('');
+    setInfoMsg('');
+
+    if (!studentId.trim()) {
+      setError('Please enter your Student ID.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your registered email address.');
+      return;
+    }
+
+    setLoading(true);
+    const { data, error: fetchErr } = await (async () => {
+      const res = await fetch('/api/auth/student/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: studentId.trim(), email: email.trim() })
+      });
+      const d = await res.json();
+      return { data: d, error: !res.ok || !d.success ? (d.message || 'Failed to send OTP.') : null };
+    })();
+    setLoading(false);
+
+    if (fetchErr) {
+      setError(fetchErr);
+      return;
+    }
+    setInfoMsg(data.message || 'OTP has been sent to your registered email address.');
+    setStep('otp');
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!otp.trim()) {
+      setError('Please enter the 6-digit OTP code.');
+      return;
+    }
+    setLoading(true);
+    const res = await fetch('/api/auth/student/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId: studentId.trim(), email: email.trim(), otp: otp.trim() })
+    });
+    const d = await res.json();
+    setLoading(false);
+
+    if (!res.ok || !d.success) {
+      setError(d.message || 'Invalid OTP code.');
+      return;
+    }
+    setError('');
+    setInfoMsg('');
+    setStep('password');
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!newPassword.trim()) {
+      setError('Please enter a new password.');
+      return;
+    }
+    if (newPassword.trim().length < 4) {
+      setError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please confirm your new password.');
+      return;
+    }
+    setLoading(true);
+    const res = await fetch('/api/auth/student/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId: studentId.trim(), email: email.trim(), otp: otp.trim(), newPassword: newPassword.trim() })
+    });
+    const d = await res.json();
+    setLoading(false);
+
+    if (!res.ok || !d.success) {
+      setError(d.message || 'Failed to reset password.');
+      return;
+    }
+    setStep('success');
+  };
+
+  return (
+    <div className="gkof-modal-overlay" onClick={handleClose}>
+      <div className="gkof-modal-box" onClick={(e) => e.stopPropagation()}>
+        <button className="gkof-modal-close" onClick={handleClose} aria-label="Close">✕</button>
+
+        <div className="gkof-modal-header">
+          <div className="gkof-modal-badge">🎓 Student Security</div>
+          <h2>Student Password Reset</h2>
+        </div>
+
+        {error && <div className="gkof-auth-error show" style={{ marginBottom: '16px' }}>{error}</div>}
+        {infoMsg && step === 'otp' && (
+          <div className="gkof-note" style={{ marginBottom: '16px', background: '#DCF3EA', borderColor: '#2E8B57', color: '#127A6E', fontWeight: 600 }}>
+            ✉️ {infoMsg}
+          </div>
+        )}
+
+        {step === 'email' && (
+          <form onSubmit={handleSendEmail}>
+            <p className="gkof-modal-desc">
+              Enter your Student ID and its registered email address to receive a 6-digit verification OTP.
+            </p>
+            <div className="gkof-field">
+              <label>Student ID</label>
+              <input
+                type="text"
+                placeholder="e.g. 24cs526"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="gkof-field">
+              <label>Registered Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. student@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Validating & Sending OTP...' : 'Send OTP'}
+            </button>
+          </form>
+        )}
+
+        {step === 'otp' && (
+          <form onSubmit={handleVerifyOtp}>
+            <p className="gkof-modal-desc">
+              Enter the 6-digit OTP code sent to your email. (OTP expires in 5 minutes).
+            </p>
+            <div className="gkof-field">
+              <label>6-Digit OTP</label>
+              <input
+                type="text"
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                style={{ letterSpacing: '4px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center' }}
+                autoFocus
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Verifying OTP...' : 'Verify OTP'}
+            </button>
+            <div className="gkof-switch" style={{ marginTop: '12px' }}>
+              Didn't receive code? <a onClick={() => handleSendEmail()}>Resend OTP</a>
+            </div>
+          </form>
+        )}
+
+        {step === 'password' && (
+          <form onSubmit={handleResetPassword}>
+            <p className="gkof-modal-desc">
+              OTP verified! Enter and confirm a new password for Student ID <strong>{studentId}</strong>.
+            </p>
+            <div className="gkof-field">
+              <label>New Password</label>
+              <PasswordInput
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="gkof-field">
+              <label>Confirm New Password</label>
+              <PasswordInput
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <button className="gkof-btn wide teal" type="submit" disabled={loading}>
+              {loading ? 'Updating Password...' : 'Update Password'}
+            </button>
+          </form>
+        )}
+
+        {step === 'success' && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+            <h3 style={{ margin: '0 0 8px', color: 'var(--teal)', fontSize: '18px' }}>
+              Password Updated Successfully!
+            </h3>
+            <p className="gkof-modal-desc" style={{ marginBottom: '20px' }}>
+              The password for Student account <strong>{studentId}</strong> has been updated. You can now log in with your new credentials.
+            </p>
+            <button className="gkof-btn wide maroon" onClick={handleClose}>
+              Back to Student Login
             </button>
           </div>
         )}

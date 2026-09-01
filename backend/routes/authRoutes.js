@@ -659,6 +659,201 @@ router.post('/faculty/reset-password', async (req, res) => {
   }
 });
 
+// =====================================================================
+// STUDENT PASSWORD RESET ROUTES
+// =====================================================================
+
+// @route   POST /api/auth/student/forgot-password
+// @desc    Initiate password reset for Student account via Student ID + Email
+// @access  Public
+router.post('/student/forgot-password', async (req, res) => {
+  try {
+    const { studentId, username, email } = req.body;
+    const inputStudentId = (studentId || username || '').trim();
+    const inputEmail = (email || '').trim().toLowerCase();
+
+    if (!inputStudentId) {
+      return res.status(400).json({ success: false, message: 'Please enter your Student ID.' });
+    }
+    if (!inputEmail) {
+      return res.status(400).json({ success: false, message: 'Please enter your registered email address.' });
+    }
+
+    const cleanStudentId = inputStudentId.toLowerCase();
+
+    // 1. Find student by username or studentId field
+    const studentUser = await User.findOne({
+      $or: [
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+      ],
+      role: 'student'
+    });
+
+    if (!studentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'No student account found with that Student ID.'
+      });
+    }
+
+    // 2. Verify email matches registered email
+    const registeredEmail = (studentUser.email || '').trim().toLowerCase();
+    if (!registeredEmail || registeredEmail !== inputEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email does not match the registered email for this Student ID.'
+      });
+    }
+
+    // 3. Generate secure 6-digit OTP (expires in 5 minutes)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 4. Send email FIRST, only save OTP if dispatch succeeds
+    const mailResult = await sendEmail({
+      to: studentUser.email,
+      subject: 'GCES Kaveri Hostel - Student Password Reset OTP',
+      text: `Hello ${studentUser.name || 'Student'},\n\nYour OTP for password reset (Student ID: ${studentUser.studentId || studentUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #2A2140; max-width: 500px; margin: 0 auto; border: 1px solid #EAD9BE; border-radius: 12px; background-color: #FBF6EC;">
+          <h2 style="color: #9E1B32; margin-top: 0;">GCES Kaveri Hostel</h2>
+          <p style="font-size: 14px;">Hello <strong>${studentUser.name || 'Student'}</strong> (${studentUser.studentId || studentUser.username}),</p>
+          <p style="font-size: 14px;">Your OTP for resetting your student account password is:</p>
+          <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #127A6E; padding: 12px 20px; background: #EAF6F4; display: inline-block; border-radius: 8px; margin: 12px 0; border: 1px solid #127A6E;">${otp}</div>
+          <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 5 minutes.</p>
+          <hr style="border: none; border-top: 1px solid #EAD9BE; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #7A7290;">If you did not request a password reset, please ignore this message.</p>
+        </div>
+      `
+    });
+
+    if (!mailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: mailResult.error || 'Unable to send OTP. Please try again later.'
+      });
+    }
+
+    // Save OTP to DB ONLY after successful email dispatch
+    studentUser.resetOtp = otp;
+    studentUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+    await studentUser.save();
+
+    return res.json({
+      success: true,
+      message: 'OTP has been sent to your registered email address.'
+    });
+  } catch (error) {
+    console.error('Student forgot-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error processing password reset request.' });
+  }
+});
+
+// @route   POST /api/auth/student/verify-otp
+// @desc    Verify OTP for Student password reset
+// @access  Public
+router.post('/student/verify-otp', async (req, res) => {
+  try {
+    const { studentId, username, email, otp } = req.body;
+    const inputStudentId = (studentId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!inputStudentId || !cleanEmail || !cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Student ID, Email, and OTP are required.' });
+    }
+
+    const cleanStudentId = inputStudentId.toLowerCase();
+
+    const studentUser = await User.findOne({
+      $or: [
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+      ],
+      email: cleanEmail,
+      role: 'student'
+    });
+
+    if (!studentUser) {
+      return res.status(404).json({ success: false, message: 'Invalid Student ID or Email.' });
+    }
+
+    if (!studentUser.resetOtp || studentUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Please check and try again.' });
+    }
+
+    if (!studentUser.resetOtpExpire || studentUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'OTP verified successfully.'
+    });
+  } catch (error) {
+    console.error('Student verify-otp error:', error);
+    return res.status(500).json({ success: false, message: 'Server error verifying OTP.' });
+  }
+});
+
+// @route   POST /api/auth/student/reset-password
+// @desc    Set new password after OTP verification for Student
+// @access  Public
+router.post('/student/reset-password', async (req, res) => {
+  try {
+    const { studentId, username, email, otp, newPassword } = req.body;
+    const inputStudentId = (studentId || username || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').trim();
+
+    if (!inputStudentId || !cleanEmail || !cleanOtp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Student ID, Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const cleanStudentId = inputStudentId.toLowerCase();
+
+    const studentUser = await User.findOne({
+      $or: [
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+      ],
+      email: cleanEmail,
+      role: 'student'
+    });
+
+    if (!studentUser) {
+      return res.status(404).json({ success: false, message: 'Student account not found.' });
+    }
+
+    if (!studentUser.resetOtp || studentUser.resetOtp !== cleanOtp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Password reset aborted.' });
+    }
+
+    if (!studentUser.resetOtpExpire || studentUser.resetOtpExpire < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
+    }
+
+    // Update password (pre-save hook hashes it via bcrypt)
+    studentUser.password = newPassword;
+    studentUser.resetOtp = '';
+    studentUser.resetOtpExpire = null;
+
+    await studentUser.save();
+
+    return res.json({
+      success: true,
+      message: 'Password updated successfully! You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('Student reset-password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating password.' });
+  }
+});
+
 module.exports = router;
 
 

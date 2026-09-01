@@ -53,10 +53,10 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  const mailUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-  if (mailUser) {
-    console.log(`[Mailer System] Real email service configured for sender: ${mailUser}`);
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    console.log('[Mailer System] Resend API configured — OTP emails enabled.');
   } else {
-    console.log('[Mailer System] WARNING: SMTP_USER is not set in process.env. Add SMTP_USER and SMTP_PASS in Render settings to enable OTP emails.');
+    console.log('[Mailer System] WARNING: RESEND_API_KEY is not set. Add it to environment variables to enable OTP emails.');
   }
 });
