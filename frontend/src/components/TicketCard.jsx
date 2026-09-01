@@ -132,13 +132,11 @@ export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
       if (r.status === 'staff_rejected') doneUpto = 1;
       if (r.status === 'notifying_parent') doneUpto = 2;
       if (r.status === 'parent_rejected') doneUpto = 2;
-      if (r.status === 'approved_final') doneUpto = 3;
-      if (r.status === 'returned') doneUpto = 4;
+      if (r.status === 'approved_final' || r.status === 'returned' || r.qrStatus === 'OUT') doneUpto = 4;
     } else {
       if (r.status === 'notifying_parent') doneUpto = 1;
       if (r.status === 'parent_rejected') doneUpto = 1;
-      if (r.status === 'approved_final') doneUpto = 2;
-      if (r.status === 'returned') doneUpto = 3;
+      if (r.status === 'approved_final' || r.status === 'returned' || r.qrStatus === 'OUT') doneUpto = 3;
     }
     const isRejected = REJECTED_STATUSES.includes(r.status);
 
