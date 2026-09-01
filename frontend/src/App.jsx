@@ -294,7 +294,6 @@ export default function App() {
                 onSubmitRequest={handleSubmitRequest}
                 onAction={handleAction}
                 onSaveProfileAddress={handleSaveProfileAddress}
-                onShareLocation={handleShareLocation}
                 activeTab={currentTab}
                 onNavigateTab={(tab) => { setCurrentTab(tab); refreshData(); }}
               />

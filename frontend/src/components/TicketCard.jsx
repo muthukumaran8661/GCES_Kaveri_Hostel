@@ -50,7 +50,7 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function TicketCard({ request: r, viewer, onAction, onShareLocation, onViewQr }) {
+export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
   const type = r.type;
   const typeLabel = r.type === 'weekday_govt'
@@ -67,15 +67,12 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
   const isDownloadable = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
   const displayId = r.requestId || r.id;
 
-  // GPS tracking state
-  const [gpsStatus, setGpsStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
-  const [gpsError, setGpsError] = useState('');
+  // GPS tracking state for staff viewer
   const [showLocationPanel, setShowLocationPanel] = useState(false);
 
-  const canShareLocation = viewer === 'student' && !REJECTED_STATUSES.includes(r.status) && r.status !== 'returned' && !!onShareLocation;
   const hasLocations = r.gpsLocations && r.gpsLocations.length > 0;
   const lastLocation = hasLocations ? r.gpsLocations[r.gpsLocations.length - 1] : null;
-  const canViewLocation = canShareLocation || hasLocations;
+  const canViewLocation = viewer === 'staff' && hasLocations;
 
   function fmtDate(d) {
     if (!d) return '—';
@@ -122,38 +119,7 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
       ' · ' + dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
   }
 
-  function handleShareLocation() {
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your browser.');
-      setGpsStatus('error');
-      return;
-    }
 
-    setGpsStatus('loading');
-    setGpsError('');
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          await onShareLocation(displayId, position.coords.latitude, position.coords.longitude);
-          setGpsStatus('success');
-          setTimeout(() => setGpsStatus('idle'), 3000);
-        } catch (err) {
-          setGpsError('Failed to share location.');
-          setGpsStatus('error');
-        }
-      },
-      (err) => {
-        let msg = 'Unable to retrieve your location.';
-        if (err.code === 1) msg = 'Location permission denied. Please allow location access.';
-        if (err.code === 2) msg = 'Location unavailable. Please try again.';
-        if (err.code === 3) msg = 'Location request timed out. Please try again.';
-        setGpsError(msg);
-        setGpsStatus('error');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }
 
   function renderTimeline() {
     const isWeekday = type === 'weekday';
@@ -352,8 +318,8 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
           )}
         </div>
 
-        {/* GPS Tracking Section */}
-        {(canShareLocation || canViewLocation) && (
+        {/* GPS Tracking Section (Staff Viewer Only) */}
+        {canViewLocation && (
           <div className="gkof-gps-section">
             <div className="gkof-gps-header" onClick={() => setShowLocationPanel(!showLocationPanel)}>
               <span className="gkof-gps-title">
@@ -369,35 +335,6 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
 
             {showLocationPanel && (
               <div className="gkof-gps-body">
-                {/* Share Location Button (student only, approved only) */}
-                {canShareLocation && (
-                  <div className="gkof-gps-share">
-                    <button
-                      className={`gkof-btn teal gkof-gps-btn ${gpsStatus === 'loading' ? 'loading' : ''}`}
-                      onClick={handleShareLocation}
-                      disabled={gpsStatus === 'loading'}
-                    >
-                      {gpsStatus === 'loading' ? (
-                        <span className="gkof-gps-btn-content">
-                          <span className="gkof-spinner"></span>
-                          Getting Location…
-                        </span>
-                      ) : gpsStatus === 'success' ? (
-                        <span className="gkof-gps-btn-content">✓ Location Shared</span>
-                      ) : (
-                        <span className="gkof-gps-btn-content">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                            <circle cx="12" cy="10" r="3" />
-                          </svg>
-                          Share My Current Location
-                        </span>
-                      )}
-                    </button>
-                    {gpsStatus === 'error' && <div className="gkof-gps-error">{gpsError}</div>}
-                  </div>
-                )}
-
                 {/* Location Display */}
                 {hasLocations && (
                   <div className="gkof-gps-info">
@@ -432,11 +369,8 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
                   </div>
                 )}
 
-                {!hasLocations && viewer === 'staff' && (
-                  <div className="gkof-gps-empty">Student hasn't shared their location yet.</div>
-                )}
-                {!hasLocations && viewer === 'student' && (
-                  <div className="gkof-gps-empty">Tap the button above to share your GPS location.</div>
+                {!hasLocations && (
+                  <div className="gkof-gps-empty">Student hasn't shared location yet.</div>
                 )}
               </div>
             )}

@@ -81,7 +81,6 @@ export default function StudentDashboard({
   onSubmitRequest,
   onAction,
   onSaveProfileAddress,
-  onShareLocation,
   activeTab = 'dashboard',
   onNavigateTab
 }) {
@@ -524,7 +523,6 @@ export default function StudentDashboard({
                   request={r}
                   viewer="student"
                   onAction={onAction}
-                  onShareLocation={onShareLocation}
                   onViewQr={() => setSelectedQrRequest(r)}
                 />
               ))
@@ -741,7 +739,6 @@ export default function StudentDashboard({
                 request={r}
                 viewer="student"
                 onAction={onAction}
-                onShareLocation={onShareLocation}
                 onViewQr={() => setSelectedQrRequest(r)}
               />
             ))
