@@ -17,6 +17,77 @@
   --line: #EAD9BE;
 }
 
+[data-theme="dark"] {
+  --bg: #12141C;
+  --card: #1E2230;
+  --ink: #E6E8EE;
+  --ink-soft: #9AA0B4;
+  --maroon: #A8243C;
+  --maroon-dark: #7A1A2C;
+  --gold: #D9A441;
+  --gold-soft: #423620;
+  --teal: #1DB9A6;
+  --blue: #4C85F6;
+  --green: #38A169;
+  --danger: #E55345;
+  --line: #2D3348;
+  color-scheme: dark;
+}
+
+[data-theme="dark"] body {
+  background: #0B0D14;
+  color: var(--ink);
+}
+
+[data-theme="dark"] .gkof-card {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: #161924 !important;
+  color: #E6E8EE !important;
+  border-color: #2D3348 !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #6C7286 !important;
+}
+
+[data-theme="dark"] .gkof-tab {
+  background: #161924;
+  color: #9AA0B4;
+  border-color: #2D3348;
+}
+
+[data-theme="dark"] .gkof-tab.active {
+  background: var(--maroon);
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] table th {
+  background: #161924 !important;
+  color: #E6E8EE !important;
+}
+
+[data-theme="dark"] table tr {
+  border-color: #2D3348 !important;
+}
+
+[data-theme="dark"] .gkof-empty {
+  color: #9AA0B4;
+}
+
+[data-theme="dark"] .gkof-note {
+  background: #25221B;
+  border-color: #423620;
+  color: #E5B24E;
+}
+
 * {
   box-sizing: border-box;
 }

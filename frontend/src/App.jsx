@@ -38,6 +38,44 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [authError, setAuthError] = useState('');
 
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem('gkof_theme') || 'system';
+  });
+
+  // Apply Theme Effect
+  useEffect(() => {
+    const applyTheme = () => {
+      let isDark = false;
+      if (themeMode === 'dark') {
+        isDark = true;
+      } else if (themeMode === 'light') {
+        isDark = false;
+      } else if (themeMode === 'system') {
+        isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    };
+
+    applyTheme();
+
+    if (themeMode === 'system' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [themeMode]);
+
+  const handleThemeChange = (newTheme) => {
+    setThemeMode(newTheme);
+    localStorage.setItem('gkof_theme', newTheme);
+  };
+
   // Global Backspace Key Navigation Prevention
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -274,7 +312,7 @@ export default function App() {
           <div className="gkof-content-pad">
             {isStaffOrFaculty ? (
               currentTab === 'profile' ? (
-                <StaffProfile session={session} onLogout={handleLogout} />
+                <StaffProfile session={session} onLogout={handleLogout} themeMode={themeMode} onThemeChange={handleThemeChange} />
               ) : (
                 <StaffDashboard
                   session={session}
@@ -286,7 +324,7 @@ export default function App() {
                 />
               )
             ) : currentTab === 'profile' ? (
-              <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} />
+              <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} themeMode={themeMode} onThemeChange={handleThemeChange} />
             ) : (
               <StudentDashboard
                 session={session}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import SettingsModal from './SettingsModal';
 
 function normalizeYear(y) {
   if (!y) return 'All Years';
@@ -11,9 +12,10 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function StaffProfile({ session, onLogout }) {
+export default function StaffProfile({ session, onLogout, themeMode = 'system', onThemeChange }) {
   const initial = (session.name || session.staffId || '?').trim().charAt(0).toUpperCase() || '?';
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const displayYear = normalizeYear(session.year);
   const isWarden = session.role === 'staff' || session.role === 'admin';
   const displayDesignation = isWarden
@@ -57,6 +59,33 @@ export default function StaffProfile({ session, onLogout }) {
         <div className="gkof-profile-row"><span className="k">Phone Number</span><span className="v">{session.phone || '—'}</span></div>
       </div>
 
+      {/* Settings Section directly below Personal Information */}
+      <div
+        className="gkof-card"
+        style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+        onClick={() => setShowSettings(true)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ background: 'var(--gold-soft)', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+              ⚙️
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '15px' }}>Settings</h3>
+              <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
+                Customize your application preferences and appearance
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--maroon)', background: 'var(--gold-soft)', padding: '3px 10px', borderRadius: '12px', textTransform: 'capitalize' }}>
+              {themeMode === 'system' ? 'System' : themeMode} Mode
+            </span>
+            <span style={{ fontSize: '16px', color: 'var(--ink-soft)', fontWeight: 'bold' }}>❯</span>
+          </div>
+        </div>
+      </div>
+
       <div className="gkof-card" style={{ textAlign: 'center' }}>
         {!showConfirm ? (
           <button className="gkof-btn red wide" onClick={handleLogoutClick}>Log Out</button>
@@ -72,6 +101,14 @@ export default function StaffProfile({ session, onLogout }) {
           </div>
         )}
       </div>
+
+      {showSettings && (
+        <SettingsModal
+          currentTheme={themeMode}
+          onThemeChange={onThemeChange}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </>
   );
 }
