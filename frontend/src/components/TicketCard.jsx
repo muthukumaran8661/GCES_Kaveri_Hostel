@@ -446,6 +446,9 @@ export default function TicketCard({ request: r, viewer, onAction, onShareLocati
         {isDownloadable && (
           <div className="gkof-btn-row">
             <button className="gkof-btn gold" onClick={downloadOutPass}>⬇️ Download Out Pass (PDF)</button>
+            {onViewQr && (
+              <button className="gkof-btn maroon" onClick={onViewQr}>📱 View Pass &amp; QR</button>
+            )}
           </div>
         )}
         {r.status === 'notifying_parent' && (
