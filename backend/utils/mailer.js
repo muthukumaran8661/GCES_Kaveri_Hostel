@@ -5,7 +5,7 @@ const { Resend } = require('resend');
  * Priority: RESEND_FROM env var > fallback to Resend's shared test sender.
  */
 function getFromAddress() {
-  return process.env.RESEND_FROM || 'GCES Kaveri Hostel <onboarding@resend.dev>';
+  return 'GCES Kaveri Hostel <no-reply@gces.net.in>';
 }
 
 /**
