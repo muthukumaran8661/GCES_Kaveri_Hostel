@@ -256,7 +256,7 @@ router.post('/warden/forgot-password', async (req, res) => {
     if (!registeredEmail || registeredEmail !== inputEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid registered email for this Warden ID.'
+        message: 'Invalid Mail ID. Please enter the email registered for this Warden ID.'
       });
     }
 
@@ -282,9 +282,10 @@ router.post('/warden/forgot-password', async (req, res) => {
     });
 
     if (!mailResult.success) {
+      console.error(`[Warden Reset] Email dispatch failed for ${wardenUser.staffId || wardenUser.username}: ${mailResult.error}`);
       return res.status(500).json({
         success: false,
-        message: mailResult.error || 'Unable to send OTP. Please try again later.'
+        message: 'Unable to send OTP at the moment. Please contact the administrator.'
       });
     }
 
@@ -478,9 +479,10 @@ router.post('/faculty/forgot-password', async (req, res) => {
     });
 
     if (!mailResult.success) {
+      console.error(`[Faculty Reset] Email dispatch failed for ${facultyUser.staffId || facultyUser.username}: ${mailResult.error}`);
       return res.status(500).json({
         success: false,
-        message: mailResult.error || 'Unable to send OTP. Please try again later.'
+        message: 'Unable to send OTP at the moment. Please contact the administrator.'
       });
     }
 
@@ -728,9 +730,10 @@ router.post('/student/forgot-password', async (req, res) => {
     });
 
     if (!mailResult.success) {
+      console.error(`[Student Reset] Email dispatch failed for ${studentUser.studentId || studentUser.username}: ${mailResult.error}`);
       return res.status(500).json({
         success: false,
-        message: mailResult.error || 'Unable to send OTP. Please try again later.'
+        message: 'Unable to send OTP at the moment. Please contact the administrator.'
       });
     }
 

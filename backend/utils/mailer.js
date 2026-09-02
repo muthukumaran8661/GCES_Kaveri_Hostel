@@ -1,45 +1,68 @@
 const { Resend } = require('resend');
 
-const FROM_ADDRESS = 'GCES <no-reply@gces.net.in>';
-
-async function sendEmail({ to, subject, text, html }) {
-  const apiKey = process.env.RESEND_API_KEY;
-
-  if (!apiKey) {
-    console.error('[Mailer Error] Missing RESEND_API_KEY environment variable.');
-    return {
-      success: false,
-      error: 'Unable to send OTP. Email service is not configured. Please add RESEND_API_KEY to environment variables.'
-    };
-  }
-
-  const resend = new Resend(apiKey);
-
-  const { data, error } = await resend.emails.send({
-    from: FROM_ADDRESS,
-    to: Array.isArray(to) ? to : [to],
-    subject,
-    html: html || `<p>${text}</p>`,
-    text: text || '',
-  });
-
-  if (error) {
-    console.error(`[Mailer Error] Resend failed to send email to ${to}:`, error);
-
-    let userFriendlyError = 'Unable to send OTP. Please try again later.';
-    if (error.name === 'validation_error') {
-      userFriendlyError = 'Email configuration error: ' + (error.message || 'Invalid sender/recipient address.');
-    } else if (error.name === 'missing_required_field') {
-      userFriendlyError = 'Email service misconfiguration. Please contact the administrator.';
-    } else if (error.message) {
-      userFriendlyError = `Unable to send OTP: ${error.message}`;
-    }
-
-    return { success: false, error: userFriendlyError };
-  }
-
-  console.log(`[Mailer] OTP email sent to ${to} via Resend (Message ID: ${data.id})`);
-  return { success: true, messageId: data.id };
+/**
+ * Resolve the sender ("from") address for Resend emails.
+ * Priority: RESEND_FROM env var > fallback to Resend's shared test sender.
+ */
+function getFromAddress() {
+  return process.env.RESEND_FROM || 'GCES Kaveri Hostel <onboarding@resend.dev>';
 }
 
-module.exports = { sendEmail };
+/**
+ * Send an email via the Resend API.
+ * Returns { success: true, messageId } on success,
+ * or { success: false, error: '<user-friendly message>' } on failure.
+ *
+ * IMPORTANT: The `error` field returned on failure is ALWAYS a generic,
+ * user-friendly message. Internal details are logged server-side only.
+ */
+async function sendEmail({ to, subject, text, html }) {
+  const GENERIC_ERROR = 'Unable to send OTP at the moment. Please contact the administrator.';
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('[Mailer Error] RESEND_API_KEY is not set. OTP emails are disabled.');
+    return { success: false, error: GENERIC_ERROR };
+  }
+
+  const fromAddress = getFromAddress();
+  const resend = new Resend(apiKey);
+
+  try {
+    console.log(`[Mailer] Attempting to send email to ${to} from ${fromAddress} via Resend...`);
+
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html: html || `<p>${text}</p>`,
+      text: text || '',
+    });
+
+    if (error) {
+      // Log full error details server-side for debugging
+      console.error(`[Resend API Error]:`, JSON.stringify(error, null, 2));
+      console.error(`[Mailer Error] Resend API rejected email to ${to}: ${JSON.stringify(error)}`);
+
+      // Check for domain verification issues specifically
+      if (error.statusCode === 403 || error.name === 'validation_error') {
+        console.error(
+          '[Mailer Error] Likely cause: Sender domain is not verified in Resend. ' +
+          'Visit https://resend.com/domains to verify your domain.'
+        );
+      }
+
+      // Never expose internal error details to the caller
+      return { success: false, error: GENERIC_ERROR };
+    }
+
+    console.log(`[Mailer] OTP email sent successfully to ${to} via Resend (Message ID: ${data.id})`);
+    return { success: true, messageId: data.id };
+  } catch (err) {
+    // Catch unexpected network/runtime errors
+    console.error(`[Mailer Error] Unexpected failure sending email to ${to}:`, err.message || err);
+    return { success: false, error: GENERIC_ERROR };
+  }
+}
+
+module.exports = { sendEmail, getFromAddress };

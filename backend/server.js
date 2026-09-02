@@ -6,6 +6,7 @@ const fs = require('fs');
 const connectDB = require('./config/db');
 const { seedWardenAccounts } = require('./config/seedWardens');
 const { seedFacultyAccounts } = require('./config/seedFaculty');
+const { getFromAddress } = require('./utils/mailer');
 
 // Load env vars from backend/.env or parent env
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -55,8 +56,9 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
-    console.log('[Mailer System] Resend API configured — OTP emails enabled.');
+    const fromAddr = getFromAddress();
+    console.log(`[Mailer System] Resend API configured — OTP emails enabled. Sending from: ${fromAddr}`);
   } else {
-    console.log('[Mailer System] WARNING: RESEND_API_KEY is not set. Add it to environment variables to enable OTP emails.');
+    console.log('[Mailer System] WARNING: RESEND_API_KEY is not set. OTP emails are disabled.');
   }
 });
