@@ -279,25 +279,6 @@ export default function App() {
             >
               Dashboard
             </div>
-            {(() => {
-              const historyCount = !isStaffOrFaculty
-                ? requests.filter(r =>
-                    (r.status === 'approved_final' || r.status === 'returned' || r.qrStatus === 'OUT') &&
-                    (r.qrToken || r.status === 'approved_final' || r.status === 'returned')
-                  ).length
-                : requests.filter(r =>
-                    ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status) ||
-                    (r.status === 'approved_final' && r.qrStatus !== 'OUT')
-                  ).length;
-              return (
-                <div
-                  className={`gkof-tab ${currentTab === 'history' ? 'active' : ''}`}
-                  onClick={() => { setCurrentTab('history'); refreshData(); }}
-                >
-                  History {historyCount > 0 ? `(${historyCount})` : ''}
-                </div>
-              );
-            })()}
             <div
               className={`gkof-tab ${currentTab === 'profile' ? 'active' : ''}`}
               onClick={() => { setCurrentTab('profile'); refreshData(); }}
