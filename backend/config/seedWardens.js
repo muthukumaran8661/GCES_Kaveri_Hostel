@@ -11,39 +11,6 @@ const WARDEN_ALLOWLIST = [
     phone: '1234567890',
     envPasswordKey: 'WARDEN_MUTHU_PASSWORD',
     defaultPassword: 'Muthu@123'
-  },
-  {
-    username: 'rajesh@123',
-    staffId: 'Rajesh@123',
-    name: 'Rajesh P',
-    designation: 'II Year Warden',
-    year: 'II Year',
-    email: 'rajeshwarden30@gmail.com',
-    phone: '0987654321',
-    envPasswordKey: 'WARDEN_RAJESH_PASSWORD',
-    defaultPassword: 'Rajesh@123'
-  },
-  {
-    username: 'deva@123',
-    staffId: 'Deva@123',
-    name: 'Deva N',
-    designation: 'I Year Warden',
-    year: 'I Year',
-    email: 'devawarden@gmail.com',
-    phone: '6789054321',
-    envPasswordKey: 'WARDEN_DEVA_PASSWORD',
-    defaultPassword: 'Deva@123'
-  },
-  {
-    username: 'prince@123',
-    staffId: 'Prince@123',
-    name: 'Prince P',
-    designation: 'III Year Warden',
-    year: 'III Year',
-    email: 'princewarden30@gmail.com',
-    phone: '1234509876',
-    envPasswordKey: 'WARDEN_PRINCE_PASSWORD',
-    defaultPassword: 'Prince@123'
   }
 ];
 

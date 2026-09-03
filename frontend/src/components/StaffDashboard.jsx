@@ -139,7 +139,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [deletingUser, setDeletingUser] = useState(null);
   const [deletingStaff, setDeletingStaff] = useState(false);
 
-  const WARDEN_ORDER_LIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+  const WARDEN_ORDER_LIST = ['muthu@123'];
   const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry'];
   const DEPT_ORDER_MAP = {
     'cse': 1,

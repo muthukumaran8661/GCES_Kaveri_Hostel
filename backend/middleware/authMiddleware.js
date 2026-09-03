@@ -1,16 +1,9 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123'];
 
-const FACULTY_ALLOWLIST_USERNAMES = [
-  'arunkumar@123', 'balakumar@123', 'dineshkumar@123', 'karthikraj@123',
-  'anandkumar@123', 'ganeshraj@123', 'harikumar@123', 'manojkumar@123',
-  'prakashraj@123', 'ravikumar@123', 'sureshbabu@123', 'vigneshkumar@123',
-  'ajaykumar@123', 'bharathraj@123', 'naveenkumar@123', 'santhoshkumar@123',
-  'ashokkumar@123', 'deepakraj@123', 'mohankumar@123', 'praveenkumar@123',
-  'gokulraj@123', 'lokeshkumar@123', 'sanjaykumar@123', 'vijayraj@123'
-];
+const FACULTY_ALLOWLIST_USERNAMES = [];
 
 const protect = async (req, res, next) => {
   let token;

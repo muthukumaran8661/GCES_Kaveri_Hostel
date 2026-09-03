@@ -55,7 +55,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
-const WARDEN_USERNAMES = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+const WARDEN_USERNAMES = ['muthu@123'];
 
 const DEPT_ORDER = {
   'cse': 1,
