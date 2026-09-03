@@ -295,14 +295,8 @@ router.post('/add-staff', protect, protectWardenAllowlist, async (req, res) => {
       });
     }
 
-    // Validation 6: Unique Email
-    const existingEmail = await User.findOne({ email: normEmail });
-    if (existingEmail) {
-      return res.status(400).json({
-        success: false,
-        message: `Registered email "${normEmail}" is already associated with another account.`
-      });
-    }
+    // Note: Multiple staff accounts may share the same registered email address.
+    // Login ID (username/staffId) serves as the unique account identifier.
 
     // Calculate designation
     const displayYear = normalizeYearDisplay(normYear);
