@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
 import StudentRequestReport, { exportRequestsToExcel } from './StudentRequestReport';
+import { generateHistoryPdf } from '../utils/historyPdfGenerator';
 
 async function apiFetch(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -89,6 +90,28 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status) ||
     (r.status === 'approved_final' && r.qrStatus !== 'OUT')
   );
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadHistoryPdf = async () => {
+    if (!history || history.length === 0) {
+      alert('No history records available to download.');
+      return;
+    }
+    try {
+      setIsGeneratingPdf(true);
+      await generateHistoryPdf({
+        role: isFaculty ? 'faculty' : 'warden',
+        session,
+        records: history
+      });
+    } catch (err) {
+      console.error('Failed to download staff history:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Admin Control State
   const [staffUsers, setStaffUsers] = useState([]);
@@ -704,20 +727,48 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         <div className="gkof-card" style={{ background: 'linear-gradient(135deg, #2A2140 0%, #3B2D59 100%)', color: '#FFF' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: '18px', color: '#FFF' }}>📜 Out Pass History</h2>
+              <h2 style={{ margin: 0, fontSize: '18px', color: '#FFF' }}>
+                {isFaculty ? '📜 Faculty Advisor Approval History' : '📜 Warden Out Pass History'}
+              </h2>
               <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--gold-soft)' }}>
-                View all completed "Outpass Ready", returned, and declined student out pass records ({history.length} records)
+                {isFaculty
+                  ? `View completed and processed approval records for ${facYearDisplay} ${session?.department || 'CSE'} (${history.length} records)`
+                  : `View all completed "Outpass Ready", returned, and archived student out pass records (${history.length} records)`}
               </p>
             </div>
-            {onNavigateTab && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button
+                id="download-staff-history-btn"
                 className="gkof-btn"
-                style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
-                onClick={() => onNavigateTab('dashboard')}
+                style={{
+                  background: 'var(--gold)',
+                  color: '#2A2140',
+                  border: 'none',
+                  fontWeight: 700,
+                  padding: '9px 16px',
+                  fontSize: '13px',
+                  cursor: isGeneratingPdf ? 'not-allowed' : 'pointer',
+                  opacity: isGeneratingPdf ? 0.8 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={handleDownloadHistoryPdf}
+                disabled={isGeneratingPdf}
+                title={`Download ${isFaculty ? 'faculty approval' : 'warden outpass'} history as PDF`}
               >
-                ← Back to Dashboard
+                {isGeneratingPdf ? '⏳ Generating PDF...' : '📥 Download History'}
               </button>
-            )}
+              {onNavigateTab && (
+                <button
+                  className="gkof-btn ghost"
+                  style={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.4)', padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+                  onClick={() => onNavigateTab('dashboard')}
+                >
+                  ← Back to Dashboard
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

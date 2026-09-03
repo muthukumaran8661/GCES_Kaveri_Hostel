@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
 import StudentQrModal from './StudentQrModal';
+import { generateHistoryPdf } from '../utils/historyPdfGenerator';
 
 function TimePicker12Hour({
   label,
@@ -101,6 +102,23 @@ export default function StudentDashboard({
   const returned = mine.filter(r => r.status === 'returned').length;
 
   const [selectedQrRequest, setSelectedQrRequest] = useState(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadHistoryPdf = async () => {
+    if (!mineHistory || mineHistory.length === 0) {
+      alert('No history records available to download.');
+      return;
+    }
+    try {
+      setIsGeneratingPdf(true);
+      await generateHistoryPdf({ role: 'student', session, records: mineHistory });
+    } catch (err) {
+      console.error('Failed to download student history:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const hasSavedHome = !!session.homeAddress;
 
@@ -498,15 +516,39 @@ export default function StudentDashboard({
                 View your approved "Outpass Ready" records with official QR codes ({historyTotal} record{historyTotal !== 1 ? 's' : ''})
               </p>
             </div>
-            {onNavigateTab && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button
+                id="download-student-history-btn"
                 className="gkof-btn"
-                style={{ background: 'var(--gold)', color: '#2A2140', border: 'none', fontWeight: 700, padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
-                onClick={() => onNavigateTab('dashboard')}
+                style={{
+                  background: 'var(--gold)',
+                  color: '#2A2140',
+                  border: 'none',
+                  fontWeight: 700,
+                  padding: '9px 16px',
+                  fontSize: '13px',
+                  cursor: isGeneratingPdf ? 'not-allowed' : 'pointer',
+                  opacity: isGeneratingPdf ? 0.8 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={handleDownloadHistoryPdf}
+                disabled={isGeneratingPdf}
+                title="Download student outpass history as PDF"
               >
-                ← Back to Dashboard
+                {isGeneratingPdf ? '⏳ Generating PDF...' : '📥 Download History'}
               </button>
-            )}
+              {onNavigateTab && (
+                <button
+                  className="gkof-btn ghost"
+                  style={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.4)', padding: '9px 16px', fontSize: '13px', cursor: 'pointer' }}
+                  onClick={() => onNavigateTab('dashboard')}
+                >
+                  ← Back to Dashboard
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
