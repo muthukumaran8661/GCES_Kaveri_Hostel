@@ -65,7 +65,10 @@ const DEPT_ORDER = {
   'mech': 4,
   'civil': 5,
   'mechatronics': 6,
-  'chemistry': 7
+  'chemistry': 7,
+  'maths': 8,
+  'physics': 9,
+  'english': 10
 };
 
 function getWardenRank(u) {

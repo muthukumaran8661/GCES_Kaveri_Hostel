@@ -134,13 +134,14 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   });
   const [addFormError, setAddFormError] = useState('');
   const [addingStaff, setAddingStaff] = useState(false);
+  const [showAddPassword, setShowAddPassword] = useState(false);
 
   // Delete Staff Modal State
   const [deletingUser, setDeletingUser] = useState(null);
   const [deletingStaff, setDeletingStaff] = useState(false);
 
   const WARDEN_ORDER_LIST = ['muthu@123'];
-  const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry'];
+  const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry', 'Maths', 'Physics', 'English'];
   const DEPT_ORDER_MAP = {
     'cse': 1,
     'ece': 2,
@@ -149,7 +150,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     'mech': 4,
     'civil': 5,
     'mechatronics': 6,
-    'chemistry': 7
+    'chemistry': 7,
+    'maths': 8,
+    'physics': 9,
+    'english': 10
   };
 
   function getWardenRank(u) {
@@ -285,6 +289,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
       const res = await apiFetch('/api/users/add-staff', 'POST', payload);
       setUpdateMsg(res.message || 'New staff account added successfully.');
       setShowAddModal(false);
+      setShowAddPassword(false);
       setAddForm({
         name: '',
         username: '',
@@ -338,7 +343,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="gkof-btn ghost" onClick={loadStaffList}>🔄 Refresh List</button>
-          <button className="gkof-btn green" onClick={() => { setShowAddModal(true); setAddFormError(''); }}>+ Add Staff</button>
+          <button className="gkof-btn green" onClick={() => { setShowAddModal(true); setAddFormError(''); setShowAddPassword(false); }}>+ Add Staff</button>
         </div>
       </div>
 
@@ -597,20 +602,45 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
 
               <div className="gkof-field">
                 <label>Password *</label>
-                <input
-                  type="password"
-                  placeholder="Enter login password"
-                  value={addForm.password}
-                  onChange={e => setAddForm({ ...addForm, password: e.target.value })}
-                  required
-                />
+                <div className="gkof-pass-wrap">
+                  <input
+                    type={showAddPassword ? 'text' : 'password'}
+                    placeholder="Enter login password"
+                    value={addForm.password}
+                    onChange={e => setAddForm({ ...addForm, password: e.target.value })}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPassword(prev => !prev)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    tabIndex={-1}
+                    aria-label={showAddPassword ? 'Hide password' : 'Show password'}
+                    title={showAddPassword ? 'Hide password' : 'Show password'}
+                    className="gkof-pass-toggle-btn"
+                  >
+                    {showAddPassword ? (
+                      /* Eye-Off Icon (click to hide) */
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      /* Eye Icon (click to show) */
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
                 <button
                   type="button"
                   className="gkof-btn ghost"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setShowAddPassword(false); }}
                   disabled={addingStaff}
                 >
                   Cancel

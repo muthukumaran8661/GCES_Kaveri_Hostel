@@ -622,6 +622,9 @@ export default function StudentRequestReport({ session, requests = [], onClose, 
                       <option value="Civil">Civil</option>
                       <option value="Mechatronics">Mechatronics</option>
                       <option value="Chemistry">Chemistry</option>
+                      <option value="Maths">Maths</option>
+                      <option value="Physics">Physics</option>
+                      <option value="English">English</option>
                     </select>
                   </div>
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-1.5 w-full md:w-auto">
