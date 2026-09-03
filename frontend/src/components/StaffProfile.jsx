@@ -37,7 +37,7 @@ export default function StaffProfile({ session, onLogout, themeMode = 'system', 
         <div className="gkof-avatar staff-avatar">{initial}</div>
         <div className="gkof-profile-name">{session.name || session.staffId || 'Warden'}</div>
         <div className="gkof-profile-role">
-          {isWarden ? 'Warden' : 'Faculty Advisor'} · {isWarden ? 'Hostel Administration' : (session.department || 'All Depts')} ({displayYear})
+          {isWarden ? 'Warden' : 'Faculty Advisor'} · {session.department || (isWarden ? 'Hostel Administration' : 'All Depts')} ({displayYear})
         </div>
       </div>
 
@@ -47,7 +47,7 @@ export default function StaffProfile({ session, onLogout, themeMode = 'system', 
         <div className="gkof-profile-row"><span className="k">{isWarden ? 'Warden ID' : 'Faculty ID'}</span><span className="v">{session.staffId || session.username || '—'}</span></div>
         <div className="gkof-profile-row"><span className="k">Role</span><span className="v" style={{ fontWeight: 600 }}>{isWarden ? 'Warden' : 'Faculty Advisor'}</span></div>
         <div className="gkof-profile-row"><span className="k">Designation</span><span className="v" style={{ fontWeight: 600 }}>{displayDesignation}</span></div>
-        <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{isWarden ? 'Hostel Administration' : (session.department || '—')}</span></div>
+        <div className="gkof-profile-row"><span className="k">Department</span><span className="v">{session.department || (isWarden ? 'Hostel Administration' : '—')}</span></div>
         <div className="gkof-profile-row"><span className="k">Assigned Year</span><span className="v" style={{ fontWeight: 600 }}>{displayYear}</span></div>
         <div className="gkof-profile-row">
           <span className="k">Approval Status</span>

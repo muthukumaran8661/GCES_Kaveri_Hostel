@@ -64,7 +64,8 @@ const DEPT_ORDER = {
   'mechanical': 4,
   'mech': 4,
   'civil': 5,
-  'mechatronics': 6
+  'mechatronics': 6,
+  'chemistry': 7
 };
 
 function getWardenRank(u) {
@@ -182,16 +183,18 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
     if (year !== undefined) targetUser.year = year.trim();
     if (status !== undefined) targetUser.status = status.trim();
 
+    if (department !== undefined) {
+      const trimmedDept = department.trim();
+      if (!trimmedDept) {
+        return res.status(400).json({ success: false, message: 'Department is required.' });
+      }
+      targetUser.department = trimmedDept;
+    }
+
     if (['staff', 'admin'].includes(targetUser.role)) {
-      targetUser.department = 'Hostel Administration';
       const normY = normalizeYearDisplay(targetUser.year);
       targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} Warden` : 'Warden');
     } else if (targetUser.role === 'faculty') {
-      if (department !== undefined) {
-        targetUser.department = department.trim();
-      } else if (targetUser.department === 'Hostel Administration') {
-        targetUser.department = 'CSE';
-      }
       const normY = normalizeYearDisplay(targetUser.year);
       targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} ${targetUser.department || ''} Faculty Advisor` : 'Faculty Advisor');
     }
@@ -257,14 +260,10 @@ router.post('/add-staff', protect, protectWardenAllowlist, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Role must be either "Warden" (staff) or "Faculty Advisor" (faculty).' });
     }
 
-    // Role-based Department enforcement
+    // Department validation for both Warden and Faculty Advisor
     let normDept = (department || '').trim();
-    if (normRole === 'staff') {
-      normDept = 'Hostel Administration';
-    } else {
-      if (!normDept) {
-        return res.status(400).json({ success: false, message: 'Department is required for Faculty Advisor.' });
-      }
+    if (!normDept) {
+      return res.status(400).json({ success: false, message: 'Department selection is required.' });
     }
 
     // Validation 3: Email format

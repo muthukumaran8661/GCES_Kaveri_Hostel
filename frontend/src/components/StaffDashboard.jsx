@@ -140,6 +140,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [deletingStaff, setDeletingStaff] = useState(false);
 
   const WARDEN_ORDER_LIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
+  const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry'];
   const DEPT_ORDER_MAP = {
     'cse': 1,
     'ece': 2,
@@ -147,7 +148,8 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     'mechanical': 4,
     'mech': 4,
     'civil': 5,
-    'mechatronics': 6
+    'mechatronics': 6,
+    'chemistry': 7
   };
 
   function getWardenRank(u) {
@@ -226,6 +228,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   };
 
   const handleAdminUpdate = async (userId) => {
+    if (!editForm.department || !editForm.department.trim()) {
+      alert('Department selection is required.');
+      return;
+    }
     try {
       const res = await apiFetch(`/api/users/${userId}/admin-update`, 'PUT', editForm);
       setUpdateMsg(res.message || 'Permissions updated successfully!');
@@ -242,7 +248,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     setAddForm(prev => ({
       ...prev,
       role: newRole,
-      department: newRole === 'staff' ? 'Hostel Administration' : (prev.department === 'Hostel Administration' ? 'CSE' : prev.department)
+      department: prev.department && prev.department !== 'Hostel Administration' ? prev.department : 'CSE'
     }));
   };
 
@@ -254,7 +260,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     if (!addForm.name.trim()) return setAddFormError('Full Name is required.');
     if (!addForm.username.trim()) return setAddFormError('Login ID is required.');
     if (!addForm.role.trim()) return setAddFormError('Role selection is required.');
-    if (addForm.role === 'faculty' && !addForm.department.trim()) return setAddFormError('Department selection is required.');
+    if (!addForm.department.trim()) return setAddFormError('Department selection is required.');
     if (!addForm.year.trim()) return setAddFormError('Assigned Year selection is required.');
     if (!addForm.email.trim()) return setAddFormError('Registered Email Address is required.');
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -269,7 +275,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         name: addForm.name.trim(),
         username: addForm.username.trim(),
         role: addForm.role.trim(),
-        department: addForm.role === 'staff' ? 'Hostel Administration' : addForm.department.trim(),
+        department: addForm.department.trim(),
         year: addForm.year.trim(),
         email: addForm.email.trim(),
         phone: addForm.phone.trim(),
@@ -377,8 +383,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                             const r = e.target.value;
                             setEditForm({
                               ...editForm,
-                              role: r,
-                              department: (r === 'staff' || r === 'admin') ? 'Hostel Administration' : (editForm.department === 'Hostel Administration' ? 'CSE' : editForm.department)
+                              role: r
                             });
                           }}
                           style={{ padding: '6px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--line)' }}
@@ -394,20 +399,18 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                     </td>
                     <td style={{ padding: '10px' }}>
                       {isEditing ? (
-                        (editForm.role === 'staff' || editForm.role === 'admin') ? (
-                          <select value="Hostel Administration" disabled style={{ padding: '6px', fontSize: '12px', backgroundColor: '#F1F3F4', cursor: 'not-allowed', borderRadius: '6px', border: '1px solid var(--line)' }}>
+                        <select
+                          value={editForm.department}
+                          onChange={e => setEditForm({ ...editForm, department: e.target.value })}
+                          style={{ padding: '6px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--line)' }}
+                        >
+                          {editForm.department === 'Hostel Administration' && (
                             <option value="Hostel Administration">Hostel Administration</option>
-                          </select>
-                        ) : (
-                          <select value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} style={{ padding: '6px', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--line)' }}>
-                            <option value="CSE">CSE</option>
-                            <option value="ECE">ECE</option>
-                            <option value="EEE">EEE</option>
-                            <option value="Mechanical">Mechanical</option>
-                            <option value="Civil">Civil</option>
-                            <option value="Mechatronics">Mechatronics</option>
-                          </select>
-                        )
+                          )}
+                          {DEPARTMENT_OPTIONS.map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
                       ) : (
                         u.department || '—'
                       )}
@@ -541,24 +544,15 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                 </div>
                 <div className="gkof-field">
                   <label>Department *</label>
-                  {addForm.role === 'staff' ? (
-                    <select value="Hostel Administration" disabled style={{ backgroundColor: '#F1F3F4', cursor: 'not-allowed' }}>
-                      <option value="Hostel Administration">Hostel Administration</option>
-                    </select>
-                  ) : (
-                    <select
-                      value={addForm.department}
-                      onChange={e => setAddForm({ ...addForm, department: e.target.value })}
-                      required
-                    >
-                      <option value="CSE">CSE</option>
-                      <option value="ECE">ECE</option>
-                      <option value="EEE">EEE</option>
-                      <option value="Mechanical">Mechanical</option>
-                      <option value="Civil">Civil</option>
-                      <option value="Mechatronics">Mechatronics</option>
-                    </select>
-                  )}
+                  <select
+                    value={addForm.department}
+                    onChange={e => setAddForm({ ...addForm, department: e.target.value })}
+                    required
+                  >
+                    {DEPARTMENT_OPTIONS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

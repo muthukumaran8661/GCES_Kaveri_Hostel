@@ -57,10 +57,9 @@ router.post('/signup', async (req, res) => {
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
       }
-      if (finalDepartment && finalDepartment.toLowerCase() !== 'hostel administration') {
-        return res.status(400).json({ success: false, message: 'Invalid department for Warden / Admin. Department must be "Hostel Administration".' });
+      if (!finalDepartment) {
+        finalDepartment = 'Hostel Administration';
       }
-      finalDepartment = 'Hostel Administration';
     } else if (role === 'faculty') {
       if (!name || !name.trim()) {
         return res.status(400).json({ success: false, message: 'Faculty Name is required.' });
