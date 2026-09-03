@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TicketCard from './TicketCard';
 import StudentRequestReport, { exportRequestsToExcel } from './StudentRequestReport';
 import { generateHistoryPdf } from '../utils/historyPdfGenerator';
+import { generateStaffDetailsPdf } from '../utils/staffDetailsPdfGenerator';
 
 async function apiFetch(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -135,6 +136,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [addFormError, setAddFormError] = useState('');
   const [addingStaff, setAddingStaff] = useState(false);
   const [showAddPassword, setShowAddPassword] = useState(false);
+  const [downloadingStaffPdf, setDownloadingStaffPdf] = useState(false);
 
   // Delete Staff Modal State
   const [deletingUser, setDeletingUser] = useState(null);
@@ -332,18 +334,59 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     }
   };
 
+  const handleDownloadStaffPdf = async () => {
+    try {
+      setDownloadingStaffPdf(true);
+      await generateStaffDetailsPdf({
+        staffList: staffUsers,
+        currentSession: session
+      });
+    } catch (err) {
+      console.error('Failed to generate staff PDF:', err);
+      alert('Failed to generate Staff & Warden Details PDF. Please try again.');
+    } finally {
+      setDownloadingStaffPdf(false);
+    }
+  };
+
   const renderAdminControlTable = () => (
     <div className="gkof-card" style={{ borderColor: 'var(--gold)' }}>
+      <div style={{ marginBottom: '14px' }}>
+        <h3 style={{ margin: 0 }}>⚙️ Admin Control – Staff Permissions &amp; Management</h3>
+        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
+          Manage Wardens &amp; Faculty Advisors. Add new staff, edit permissions, department, assigned year, or delete accounts.
+        </p>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-        <div>
-          <h3 style={{ margin: 0 }}>⚙️ Admin Control – Staff Permissions &amp; Management</h3>
-          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
-            Manage Wardens &amp; Faculty Advisors. Add new staff, edit permissions, department, assigned year, or delete accounts.
-          </p>
-        </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="gkof-btn ghost" onClick={loadStaffList}>🔄 Refresh List</button>
-          <button className="gkof-btn green" onClick={() => { setShowAddModal(true); setAddFormError(''); setShowAddPassword(false); }}>+ Add Staff</button>
+          <button
+            type="button"
+            className="gkof-btn"
+            onClick={handleDownloadStaffPdf}
+            disabled={downloadingStaffPdf || loadingStaff}
+            style={{
+              background: '#FFF8EC',
+              color: 'var(--maroon)',
+              border: '1px solid var(--gold)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: downloadingStaffPdf ? 'wait' : 'pointer'
+            }}
+            title="Download all Staff & Warden account details as PDF"
+          >
+            {downloadingStaffPdf ? '⏳ Generating PDF…' : '📄 Download Staff & Warden Details (PDF)'}
+          </button>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            className="gkof-btn green"
+            onClick={() => { setShowAddModal(true); setAddFormError(''); setShowAddPassword(false); }}
+          >
+            + Add Staff
+          </button>
         </div>
       </div>
 
