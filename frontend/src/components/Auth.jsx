@@ -358,6 +358,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                         <option value="Mechanical">Mechanical</option>
                         <option value="Civil">Civil</option>
                         <option value="Mechatronics">Mechatronics</option>
+                        <option value="Maths">Maths</option>
+                        <option value="Physics">Physics</option>
+                        <option value="English">English</option>
+                        <option value="Chemistry">Chemistry</option>
                       </select>
                     </div>
                     <div className="gkof-field">
@@ -435,6 +439,10 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                             <option value="Mechanical">Mechanical</option>
                             <option value="Civil">Civil</option>
                             <option value="Mechatronics">Mechatronics</option>
+                            <option value="Maths">Maths</option>
+                            <option value="Physics">Physics</option>
+                            <option value="English">English</option>
+                            <option value="Chemistry">Chemistry</option>
                           </select>
                         </div>
                       </div>

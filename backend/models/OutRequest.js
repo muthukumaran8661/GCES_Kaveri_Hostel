@@ -79,6 +79,21 @@ const OutRequestSchema = new mongoose.Schema({
     ],
     required: true
   },
+  currentApprovalStage: {
+    type: String,
+    enum: ['FACULTY', 'WARDEN', 'PARENT', 'READY', 'REJECTED', 'CANCELLED', 'RETURNED'],
+    default: 'FACULTY'
+  },
+  assignedFacultyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  assignedWardenId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   callAttempts: {
     type: Number,
     default: 0

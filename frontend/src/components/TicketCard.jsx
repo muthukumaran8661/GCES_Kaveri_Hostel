@@ -267,7 +267,7 @@ export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
   }
 
   const reqYearDisplay = normalizeYear(r.year);
-  const showQrOnPass = (r.status === 'approved_final' || r.status === 'returned');
+  const showQrOnPass = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
 
   return (
     <div className="gkof-ticket">

@@ -69,10 +69,32 @@ const protectFacultyAllowlist = (req, res, next) => {
   });
 };
 
+const protectStaffOrFaculty = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
+  }
+
+  if (['staff', 'faculty', 'admin'].includes(req.user.role)) {
+    if (req.user.status === 'inactive') {
+      return res.status(403).json({
+        success: false,
+        message: '403 Forbidden: Your account is currently inactive. Please contact Administrator.'
+      });
+    }
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: '403 Forbidden: Access Denied. Only Faculty Advisors and Wardens are granted access.'
+  });
+};
+
 module.exports = {
   protect,
   protectWardenAllowlist,
   protectFacultyAllowlist,
+  protectStaffOrFaculty,
   WARDEN_ALLOWLIST_USERNAMES,
   FACULTY_ALLOWLIST_USERNAMES
 };

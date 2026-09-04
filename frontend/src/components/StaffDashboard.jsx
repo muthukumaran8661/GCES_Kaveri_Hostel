@@ -23,31 +23,12 @@ async function apiFetch(endpoint, method = 'GET', data = null) {
   return result;
 }
 
-function normalizeYear(y) {
-  if (!y) return 'I Year';
-  const s = String(y).trim();
-  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I Year';
-  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II Year';
-  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III Year';
-  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV Year';
-  if (/ALL/i.test(s)) return 'All Years';
-  return s;
-}
+import { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } from '../utils/normalization';
 
 export default function StaffDashboard({ session, requests, onAction, onRefreshUsers, activeTab = 'dashboard', onNavigateTab }) {
   const isFaculty = session && session.role === 'faculty';
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
 
-  const WARDEN_ALLOWLIST = ['muthu@123', 'rajesh@123', 'deva@123', 'prince@123'];
-  const FACULTY_ALLOWLIST = [
-    'arunkumar@123', 'balakumar@123', 'dineshkumar@123', 'karthikraj@123',
-    'anandkumar@123', 'ganeshraj@123', 'harikumar@123', 'manojkumar@123',
-    'prakashraj@123', 'ravikumar@123', 'sureshbabu@123', 'vigneshkumar@123',
-    'ajaykumar@123', 'bharathraj@123', 'naveenkumar@123', 'santhoshkumar@123',
-    'ashokkumar@123', 'deepakraj@123', 'mohankumar@123', 'praveenkumar@123',
-    'gokulraj@123', 'lokeshkumar@123', 'sanjaykumar@123', 'vijayraj@123'
-  ];
-  const userUname = (session?.username || session?.staffId || '').trim().toLowerCase();
   const isAuthorizedWarden = !isAdminOrWarden || session?.status !== 'inactive';
   const isAuthorizedFaculty = !isFaculty || session?.status !== 'inactive';
 
@@ -72,23 +53,46 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     );
   }
 
-  // Filter requests based on status and user role
-  const pendingFaculty = requests.filter(r => r.status === 'pending_faculty');
-  const pendingStaff = requests.filter(r => r.status === 'pending_staff');
-  const notifying = requests.filter(r => r.status === 'notifying_parent');
-  const outNow = requests.filter(r => r.qrStatus === 'OUT');
-  const returnedToday = requests.filter(r => r.status === 'returned');
+  // Filter requests based on status, dynamic assignment, and user role
+  const scopedRequests = requests.filter(r => {
+    if (session?.role === 'admin') return true;
+    if (isFaculty) {
+      return matchesDepartment(session?.department, r.department) &&
+             matchesYear(session?.year, r.year);
+    }
+    if (isAdminOrWarden) {
+      if (!matchesYear(session?.year, r.year)) return false;
+      const wardenDept = normalizeDepartment(session?.department);
+      if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
+        return false;
+      }
+      // Wardens must not see weekday requests before Faculty Advisor approval
+      if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+        return false;
+      }
+      return true;
+    }
+    return true;
+  });
+
+  const pendingFaculty = scopedRequests.filter(r => r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY');
+  const pendingStaff = scopedRequests.filter(r => r.status === 'pending_staff' || r.currentApprovalStage === 'WARDEN');
+  const notifying = scopedRequests.filter(r => r.status === 'notifying_parent' || r.currentApprovalStage === 'PARENT');
+  const outNow = scopedRequests.filter(r => r.qrStatus === 'OUT');
+  const returnedToday = scopedRequests.filter(r => r.status === 'returned');
 
   // Queue logic:
-  // For Faculty: show requests awaiting faculty advisor approval (pending_faculty)
-  // For Staff/Warden: show requests awaiting warden approval (pending_staff) and parent calls (notifying_parent)
+  // For Faculty: show requests awaiting faculty advisor approval (pending_faculty / stage: FACULTY)
+  // For Staff/Warden: show requests awaiting warden approval (pending_staff / stage: WARDEN) and parent calls (stage: PARENT)
   const queue = isFaculty
     ? pendingFaculty
     : [...pendingStaff, ...notifying];
 
   const activeOut = outNow.slice();
-  const history = requests.filter(r =>
+  const history = scopedRequests.filter(r =>
     ['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(r.status) ||
+    r.currentApprovalStage === 'REJECTED' ||
+    r.currentApprovalStage === 'RETURNED' ||
     (r.status === 'approved_final' && r.qrStatus !== 'OUT')
   );
 

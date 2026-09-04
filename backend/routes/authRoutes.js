@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect, WARDEN_ALLOWLIST_USERNAMES, FACULTY_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
 const { sendEmail } = require('../utils/mailer');
+const { normalizeDepartment, normalizeYear } = require('../utils/normalization');
 
 
 const generateToken = (id) => {
@@ -44,6 +45,7 @@ router.post('/signup', async (req, res) => {
     }
 
     let finalDepartment = (department || '').trim();
+    let finalYear = (year || '').trim();
 
     // Additional validations & department enforcement
     if (role === 'student') {
@@ -53,6 +55,8 @@ router.post('/signup', async (req, res) => {
       if (!/^[0-9]+$/.test(room)) {
         return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
       }
+      finalDepartment = normalizeDepartment(department);
+      finalYear = normalizeYear(year);
     } else if (role === 'staff' || role === 'admin') {
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
@@ -67,6 +71,8 @@ router.post('/signup', async (req, res) => {
       if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
         return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
       }
+      finalDepartment = normalizeDepartment(department);
+      finalYear = normalizeYear(year);
     }
 
     const user = await User.create({
@@ -80,7 +86,7 @@ router.post('/signup', async (req, res) => {
       staffId: staffId || normalizedUsername,
       designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden / Admin'),
       department: finalDepartment,
-      year: year || '',
+      year: finalYear,
       status: 'active',
       email: email || '',
       phone: phone || '',

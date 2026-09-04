@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
+const { normalizeDepartment, normalizeYear } = require('../utils/normalization');
 
 // @route   PUT /api/users/profile
 // @desc    Update user profile details (e.g. homeAddress, department, year)
@@ -183,7 +184,7 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
       }
       targetUser.role = trimmedRole;
     }
-    if (year !== undefined) targetUser.year = year.trim();
+    if (year !== undefined) targetUser.year = normalizeYear(year);
     if (status !== undefined) targetUser.status = status.trim();
 
     if (department !== undefined) {
@@ -191,15 +192,14 @@ router.put('/:id/admin-update', protect, protectWardenAllowlist, async (req, res
       if (!trimmedDept) {
         return res.status(400).json({ success: false, message: 'Department is required.' });
       }
-      targetUser.department = trimmedDept;
+      targetUser.department = normalizeDepartment(trimmedDept);
     }
 
+    const normY = targetUser.year || 'All Years';
     if (['staff', 'admin'].includes(targetUser.role)) {
-      const normY = normalizeYearDisplay(targetUser.year);
       targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} Warden` : 'Warden');
     } else if (targetUser.role === 'faculty') {
-      const normY = normalizeYearDisplay(targetUser.year);
-      targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} ${targetUser.department || ''} Faculty Advisor` : 'Faculty Advisor');
+      targetUser.designation = designation ? designation.trim() : (normY && normY !== 'All Years' ? `${normY} ${targetUser.department || ''} Faculty Advisor` : `${targetUser.department || ''} Faculty Advisor`);
     }
 
     await targetUser.save();
@@ -253,7 +253,7 @@ router.post('/add-staff', protect, protectWardenAllowlist, async (req, res) => {
     const normName = name.trim();
     const normUsername = username.trim().toLowerCase();
     const normRole = role.trim().toLowerCase();
-    const normYear = year.trim();
+    const normYear = normalizeYear(year);
     const normEmail = email.trim().toLowerCase();
     const normPhone = phone.trim();
     const rawPassword = password.trim();
@@ -264,7 +264,7 @@ router.post('/add-staff', protect, protectWardenAllowlist, async (req, res) => {
     }
 
     // Department validation for both Warden and Faculty Advisor
-    let normDept = (department || '').trim();
+    let normDept = normalizeDepartment(department);
     if (!normDept) {
       return res.status(400).json({ success: false, message: 'Department selection is required.' });
     }

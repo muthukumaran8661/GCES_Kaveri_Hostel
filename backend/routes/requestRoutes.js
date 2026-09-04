@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const OutRequest = require('../models/OutRequest');
 const User = require('../models/User');
-const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
+const { protect, protectStaffOrFaculty, protectWardenAllowlist } = require('../middleware/authMiddleware');
+const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } = require('../utils/normalization');
 
 function uid() {
   return 'REQ' + Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -155,10 +156,60 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
+    // DYNAMIC MASTER ASSIGNMENT ROUTING & VALIDATION
+    const studentDept = normalizeDepartment(req.user.department || department);
+    const studentYear = normalizeYear(req.user.year || year);
+
+    // Query active Faculty and Wardens
+    const activeStaffUsers = await User.find({
+      role: { $in: ['faculty', 'staff'] },
+      status: 'active'
+    }).lean();
+
+    // Match Faculty Advisors for this student's Department and Year
+    const matchedFaculties = activeStaffUsers.filter(u =>
+      u.role === 'faculty' &&
+      matchesDepartment(u.department, studentDept) &&
+      matchesYear(u.year, studentYear)
+    );
+
+    // Match Wardens for this student's Year and Department (or general hostel administration)
+    const matchedWardens = activeStaffUsers.filter(u =>
+      u.role === 'staff' &&
+      (matchesDepartment(u.department, studentDept) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
+      matchesYear(u.year, studentYear)
+    );
+
+    console.log(`[ROUTING] Student Dept: ${studentDept}, Year: ${studentYear}`);
+    console.log(`[ROUTING] Matched Faculty: [${matchedFaculties.map(f => f.staffId || f.username || f._id).join(', ')}]`);
+    console.log(`[ROUTING] Matched Warden: [${matchedWardens.map(w => w.staffId || w.username || w._id).join(', ')}]`);
+
+    // Strict validation
+    if (type === 'weekday') {
+      if (matchedFaculties.length === 0 || matchedWardens.length === 0) {
+        console.error(`[ROUTING ERROR] No active Faculty Advisor or Warden found for student ${req.user.username} (${studentDept} - ${studentYear}). Matched Faculty: ${matchedFaculties.length}, Matched Warden: ${matchedWardens.length}`);
+        return res.status(400).json({
+          success: false,
+          message: 'No active Faculty Advisor/Warden is assigned to your department and year. Please contact the administrator.'
+        });
+      }
+    } else {
+      if (matchedWardens.length === 0) {
+        console.error(`[ROUTING ERROR] No active Warden found for student ${req.user.username} (${studentDept} - ${studentYear}).`);
+        return res.status(400).json({
+          success: false,
+          message: 'No active Faculty Advisor/Warden is assigned to your department and year. Please contact the administrator.'
+        });
+      }
+    }
+
+    const assignedFacultyId = matchedFaculties[0]?._id || null;
+    const assignedWardenId = matchedWardens[0]?._id || null;
+    const currentApprovalStage = type === 'weekday' ? 'FACULTY' : 'WARDEN';
     const status = type === 'weekday' ? 'pending_faculty' : 'pending_staff';
     const initialLog = type === 'weekday'
-      ? 'Submitted by student — awaiting Faculty Advisor'
-      : 'Submitted by student — awaiting Warden';
+      ? `Submitted by student (${studentDept} - ${studentYear}) — awaiting Faculty Advisor (${matchedFaculties[0]?.name || 'Assigned Faculty'})`
+      : `Submitted by student (${studentDept} - ${studentYear}) — awaiting Warden (${matchedWardens[0]?.name || 'Assigned Warden'})`;
 
     const requestId = uid();
 
@@ -168,8 +219,11 @@ router.post('/', protect, async (req, res) => {
       name: req.user.name,
       reg: req.user.reg || '',
       studentPhone: req.user.phone || '',
-      department: req.user.department || department || '',
-      year: req.user.year || year || '',
+      department: studentDept,
+      year: studentYear,
+      assignedFacultyId,
+      assignedWardenId,
+      currentApprovalStage,
       room,
       dest,
       fromDate,
@@ -209,12 +263,21 @@ router.get('/student', protect, async (req, res) => {
         await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
       }
 
+      const currentApprovalStage = r.currentApprovalStage || (
+        r.status === 'pending_faculty' ? 'FACULTY' :
+        r.status === 'pending_staff' ? 'WARDEN' :
+        r.status === 'notifying_parent' ? 'PARENT' :
+        r.status === 'approved_final' ? 'READY' :
+        r.status === 'returned' ? 'RETURNED' : 'REJECTED'
+      );
+
       return {
         ...r,
+        currentApprovalStage,
         qrToken: token || r.qrToken,
         qrStatus: status,
-        department: req.user.department || r.department || '',
-        year: req.user.year || r.year || '',
+        department: normalizeDepartment(req.user.department || r.department || ''),
+        year: normalizeYear(req.user.year || r.year || ''),
         studentPhone: req.user.phone || r.studentPhone || ''
       };
     }));
@@ -225,41 +288,11 @@ router.get('/student', protect, async (req, res) => {
   }
 });
 
-function normalizeYearKey(y) {
-  if (!y) return '';
-  const s = String(y).trim();
-  if (/^I(\s+Year)?$/i.test(s) || /^1(st)?(\s+Year)?$/i.test(s)) return 'I';
-  if (/^II(\s+Year)?$/i.test(s) || /^2(nd)?(\s+Year)?$/i.test(s)) return 'II';
-  if (/^III(\s+Year)?$/i.test(s) || /^3(rd)?(\s+Year)?$/i.test(s)) return 'III';
-  if (/^IV(\s+Year)?$/i.test(s) || /^4(th)?(\s+Year)?$/i.test(s)) return 'IV';
-  if (/ALL/i.test(s)) return 'ALL';
-  return s.toUpperCase();
-}
-
-function getWardenYearKey(user) {
-  if (user && user.year) {
-    const k = normalizeYearKey(user.year);
-    if (['I', 'II', 'III', 'IV', 'ALL'].includes(k)) return k;
-  }
-  const uname = (user?.username || user?.staffId || '').toLowerCase();
-  const name = (user?.name || '').toLowerCase();
-
-  if (uname.includes('deva') || name.includes('deva')) return 'I';
-  if (uname.includes('rajesh') || name.includes('rajesh')) return 'II';
-  if (uname.includes('prince') || name.includes('prince')) return 'III';
-  if (uname.includes('muthu') || name.includes('muthukumaran')) return 'IV';
-  return 'ALL';
-}
-
 // @route   GET /api/requests/staff
 // @desc    Get all requests for staff/faculty dashboard queues
 // @access  Private (Staff/Faculty/Admin)
-router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
+router.get('/staff', protect, protectStaffOrFaculty, async (req, res) => {
   try {
-    if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied. Warden/Admin or Faculty only.' });
-    }
-
     const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
 
     // Enrich requests with latest student User profile database data
@@ -281,44 +314,61 @@ router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
         await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
       }
 
+      const reqDept = normalizeDepartment(u?.department || r.department || '');
+      const reqYear = normalizeYear(u?.year || r.year || '');
+      const currentApprovalStage = r.currentApprovalStage || (
+        r.status === 'pending_faculty' ? 'FACULTY' :
+        r.status === 'pending_staff' ? 'WARDEN' :
+        r.status === 'notifying_parent' ? 'PARENT' :
+        r.status === 'approved_final' ? 'READY' :
+        r.status === 'returned' ? 'RETURNED' : 'REJECTED'
+      );
+
       return {
         ...r,
+        currentApprovalStage,
         qrToken: token || r.qrToken,
         qrStatus: status,
-        department: u?.department || r.department || '',
-        year: u?.year || r.year || '',
+        department: reqDept,
+        year: reqYear,
         studentPhone: u?.phone || r.studentPhone || ''
       };
     }));
 
     // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
     if (req.user.role === 'faculty') {
-      const facDept = (req.user.department || '').trim().toLowerCase();
-      const facYear = normalizeYearKey(req.user.year);
-
       const filtered = enrichedRequests.filter(r => {
-        const reqDept = (r.department || '').trim().toLowerCase();
-        const reqYear = normalizeYearKey(r.year);
-        return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
+        return matchesDepartment(req.user.department, r.department) &&
+               matchesYear(req.user.year, r.year);
       });
       return res.json({ success: true, requests: filtered });
     }
 
-    // Dynamic Warden Filter: Year-Wise Wardens ONLY see requests matching their assigned Student Year
-    // AND Wardens MUST NOT see weekday requests before Faculty Advisor approval (pending_faculty)
+    // Dynamic Warden Filter: Wardens ONLY see requests matching their assigned Student Year
+    // (and Department if specifically configured, otherwise general hostel administration)
+    // AND Wardens MUST NOT see weekday requests before Faculty Advisor approval (pending_faculty / stage FACULTY)
     if (req.user.role === 'staff') {
-      const wardenYear = getWardenYearKey(req.user);
-
       const filtered = enrichedRequests.filter(r => {
-        const reqYear = normalizeYearKey(r.year);
-        if (wardenYear !== 'ALL' && reqYear !== wardenYear) return false;
+        // Check year match
+        if (!matchesYear(req.user.year, r.year)) return false;
+
+        // Check department match if warden is department-specific
+        const wardenDept = normalizeDepartment(req.user.department);
+        if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
+          return false;
+        }
+
         // MUST NOT RECEIVE EARLY: Weekday requests pending faculty approval stay strictly with Faculty Advisor
-        if (r.type === 'weekday' && r.status === 'pending_faculty') return false;
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+
         return true;
       });
       return res.json({ success: true, requests: filtered });
     }
 
+    // Admin sees all
     return res.json({ success: true, requests: enrichedRequests });
   } catch (error) {
     console.error('Get staff requests error:', error);
@@ -329,7 +379,7 @@ router.get('/staff', protect, protectWardenAllowlist, async (req, res) => {
 // @route   PATCH /api/requests/:id/action
 // @desc    Update request status / log based on action
 // @access  Private (Staff/Faculty/Student)
-router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) => {
+router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => {
   try {
     const { action } = req.body;
     const request = await findRequestById(req.params.id);
@@ -340,14 +390,7 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
 
     // STRICT BACKEND AUTHORIZATION FOR FACULTY APPROVAL / DECLINE
     if (action === 'faculty_approved' || action === 'faculty_rejected') {
-      if (req.user.status === 'inactive') {
-        return res.status(403).json({
-          success: false,
-          message: '403 Forbidden: Your faculty account is inactive. Please contact Administrator.'
-        });
-      }
-
-      if (req.user.role !== 'faculty' && req.user.role !== 'admin' && req.user.role !== 'staff') {
+      if (req.user.role !== 'faculty' && req.user.role !== 'admin') {
         return res.status(403).json({
           success: false,
           message: '403 Forbidden: Only assigned Faculty Advisors are authorized to take action on this request.'
@@ -355,15 +398,11 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
       }
 
       if (req.user.role === 'faculty') {
-        const facDept = (req.user.department || '').trim().toLowerCase();
-        const facYear = normalizeYearKey(req.user.year);
-        const reqDept = (request.department || '').trim().toLowerCase();
-        const reqYear = normalizeYearKey(request.year);
-
-        if (!facDept || !facYear || facDept !== reqDept || (facYear !== 'ALL' && facYear !== reqYear)) {
+        if (!matchesDepartment(req.user.department, request.department) ||
+            !matchesYear(req.user.year, request.year)) {
           return res.status(403).json({
             success: false,
-            message: `403 Forbidden: You are not authorized to approve this student's request. Your assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match Student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
+            message: `403 Forbidden: You are not authorized to take action on this student's request. Your assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match Student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
           });
         }
       }
@@ -379,17 +418,22 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
       }
 
       if (req.user.role === 'staff') {
-        const wardenYear = getWardenYearKey(req.user);
-        const reqYear = normalizeYearKey(request.year);
-
-        if (wardenYear !== 'ALL' && reqYear !== wardenYear) {
+        if (!matchesYear(req.user.year, request.year)) {
           return res.status(403).json({
             success: false,
-            message: `403 Forbidden: You are not authorized to approve requests for ${request.year || 'this Year'}. You are assigned as ${req.user.name} (${wardenYear} Year Warden).`
+            message: `403 Forbidden: You are not authorized to approve requests for ${request.year || 'this Year'}. Your assignment is ${req.user.year || 'N/A'}.`
           });
         }
 
-        if (request.type === 'weekday' && request.status === 'pending_faculty') {
+        const wardenDept = normalizeDepartment(req.user.department);
+        if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, request.department)) {
+          return res.status(403).json({
+            success: false,
+            message: `403 Forbidden: You are not authorized for department ${request.department}.`
+          });
+        }
+
+        if (request.type === 'weekday' && (request.status === 'pending_faculty' || request.currentApprovalStage === 'FACULTY')) {
           return res.status(403).json({
             success: false,
             message: '403 Forbidden: Weekday out pass requires Faculty Advisor approval before Warden approval.'
@@ -401,12 +445,14 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
     switch (action) {
       case 'faculty_approved':
         request.status = 'pending_staff';
+        request.currentApprovalStage = 'WARDEN';
         request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
         request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Approved — forwarded to Warden`);
         break;
       case 'faculty_rejected':
         request.status = 'faculty_rejected';
+        request.currentApprovalStage = 'REJECTED';
         request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
         request.rejectionReason = req.body.reason || 'Declined by Faculty Advisor';
@@ -414,6 +460,7 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
         break;
       case 'staff_approved':
         request.status = 'notifying_parent';
+        request.currentApprovalStage = 'PARENT';
         request.wardenActionBy = req.user.name || req.user.username;
         request.wardenActionAt = new Date();
         request.callAttempts = 1;
@@ -421,6 +468,7 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
         break;
       case 'staff_rejected':
         request.status = 'staff_rejected';
+        request.currentApprovalStage = 'REJECTED';
         request.wardenActionBy = req.user.name || req.user.username;
         request.wardenActionAt = new Date();
         request.rejectionReason = req.body.reason || 'Declined by Warden';
@@ -428,6 +476,7 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
         break;
       case 'parent_approved':
         request.status = 'approved_final';
+        request.currentApprovalStage = 'READY';
         if (!request.qrToken) {
           const randHex = crypto.randomBytes(3).toString('hex').toUpperCase();
           request.qrToken = `${request.requestId || 'REQ'}-${randHex}`;
@@ -437,11 +486,14 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
         break;
       case 'parent_rejected':
         request.status = 'parent_rejected';
+        request.currentApprovalStage = 'REJECTED';
         request.rejectionReason = req.body.reason || 'Declined by Parent';
         request.log.push('Parent declined the request');
         break;
       case 'returned':
         request.status = 'returned';
+        request.currentApprovalStage = 'RETURNED';
+        request.qrStatus = 'RETURNED';
         request.log.push('Student checked back in at hostel gate');
         break;
       case 'retry_call':
@@ -470,16 +522,8 @@ router.patch('/:id/action', protect, protectWardenAllowlist, async (req, res) =>
 // @route   GET /api/requests/report
 // @desc    Get detailed report & analytics data with strict RBAC
 // @access  Private (Warden/Faculty/Admin only)
-router.get('/report', protect, protectWardenAllowlist, async (req, res) => {
+router.get('/report', protect, protectStaffOrFaculty, async (req, res) => {
   try {
-    if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied. Report generation is restricted to authorized Staff and Faculty Advisors.' });
-    }
-
-    if (req.user.role === 'faculty' && req.user.status === 'inactive') {
-      return res.status(403).json({ success: false, message: '403 Forbidden: Your faculty account is inactive. Please contact Administrator.' });
-    }
-
     const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
     const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name room homeAddress').lean();
     
@@ -493,8 +537,8 @@ router.get('/report', protect, protectWardenAllowlist, async (req, res) => {
       const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
       return {
         ...r,
-        department: u?.department || r.department || '',
-        year: u?.year || r.year || '',
+        department: normalizeDepartment(u?.department || r.department || ''),
+        year: normalizeYear(u?.year || r.year || ''),
         room: r.room || u?.room || '',
         dest: r.dest || u?.homeAddress || '',
         parentPhone: r.parentPhone || '',
@@ -503,13 +547,20 @@ router.get('/report', protect, protectWardenAllowlist, async (req, res) => {
     });
 
     if (req.user.role === 'faculty') {
-      const facDept = (req.user.department || '').trim().toLowerCase();
-      const facYear = normalizeYearKey(req.user.year);
-
       const scopedRequests = enriched.filter(r => {
-        const reqDept = (r.department || '').trim().toLowerCase();
-        const reqYear = normalizeYearKey(r.year);
-        return reqDept === facDept && (facYear === 'ALL' || reqYear === facYear);
+        return matchesDepartment(req.user.department, r.department) &&
+               matchesYear(req.user.year, r.year);
+      });
+
+      return res.json({ success: true, requests: scopedRequests });
+    }
+
+    if (req.user.role === 'staff') {
+      const scopedRequests = enriched.filter(r => {
+        if (!matchesYear(req.user.year, r.year)) return false;
+        const wardenDept = normalizeDepartment(req.user.department);
+        if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) return false;
+        return true;
       });
 
       return res.json({ success: true, requests: scopedRequests });

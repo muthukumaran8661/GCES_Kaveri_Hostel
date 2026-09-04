@@ -59,16 +59,7 @@ async function seedWardenAccounts() {
       }
     }
 
-    // Ensure any non-allowlisted staff/admin accounts are deactivated
-    await User.updateMany(
-      {
-        role: { $in: ['staff', 'admin'] },
-        username: { $nin: ALLOWED_USERNAMES }
-      },
-      { status: 'inactive' }
-    );
-
-    console.log('[Seed] Fixed 4-Member Warden Account System verified.');
+    console.log('[Seed] Warden seed verification completed. Custom staff accounts preserved.');
   } catch (error) {
     console.error('[Seed Error] Failed to seed Warden accounts:', error);
   }
