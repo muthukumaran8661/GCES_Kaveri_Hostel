@@ -67,6 +67,22 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
     }
 
+    // Email ID validation (Mandatory, Format, Unique)
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      return res.status(400).json({ success: false, message: 'Email ID is required.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+
+    const emailExists = await Student.findOne({ email: cleanEmail });
+    if (emailExists) {
+      return res.status(400).json({ success: false, message: 'This email ID is already registered.' });
+    }
+
     const finalDepartment = normalizeDepartment(department);
     const finalYear = normalizeYear(year);
 
@@ -82,7 +98,7 @@ router.post('/signup', async (req, res) => {
       department: finalDepartment,
       year: finalYear,
       status: 'active',
-      email: (email || '').trim().toLowerCase(),
+      email: cleanEmail,
       phone: (phone || '').trim(),
       homeAddress: (homeAddress || '').trim()
     });

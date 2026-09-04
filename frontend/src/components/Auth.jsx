@@ -66,6 +66,8 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [regNo, setRegNo] = useState('');
   const [roomNo, setRoomNo] = useState('');
   const [name, setName] = useState('');
+  const [studentEmail, setStudentEmail] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
   const [homeAddress, setHomeAddress] = useState('');
 
   // Staff/Faculty form state
@@ -129,6 +131,16 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         setError('Room No. must be numbers only.');
         return;
       }
+      const cleanStudentEmail = studentEmail.trim().toLowerCase();
+      if (!cleanStudentEmail) {
+        setError('Email ID is required.');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanStudentEmail)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
       onSignup({
         role: 'student',
         username: studentId.trim(),
@@ -139,6 +151,8 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         studentId: studentId.trim(),
         department: department.trim(),
         year: year.trim(),
+        email: cleanStudentEmail,
+        phone: studentPhone.trim(),
         homeAddress: homeAddress.trim()
       });
     } else {
@@ -373,6 +387,26 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                         <option value="IV Year">IV Year</option>
                       </select>
                     </div>
+                  </div>
+                  <div className="gkof-field">
+                    <label>Email ID <span style={{ color: 'var(--red)', fontSize: '13px' }}>*</span></label>
+                    <input
+                      type="email"
+                      placeholder="e.g. student@example.com"
+                      value={studentEmail}
+                      onChange={(e) => setStudentEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="gkof-field">
+                    <label>Phone Number</label>
+                    <input
+                      placeholder="e.g. 9876543210"
+                      maxLength={10}
+                      inputMode="numeric"
+                      value={studentPhone}
+                      onChange={(e) => setStudentPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                    />
                   </div>
                   <div className="gkof-field">
                     <label>Home Address (Permanent)</label>

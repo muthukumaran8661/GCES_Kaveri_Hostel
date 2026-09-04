@@ -219,6 +219,20 @@ export default function App() {
     }
   };
 
+  const handleUpdateYear = async (newYear) => {
+    try {
+      const res = await apiFetch('/api/users/profile', 'PUT', { year: newYear });
+      if (res && res.user) {
+        setSession(res.user);
+      }
+      return res;
+    } catch (err) {
+      console.error('Update year error:', err);
+      alert(err.message || 'Failed to update Year');
+      throw err;
+    }
+  };
+
   const handleSubmitRequest = async (reqData) => {
     try {
       const res = await apiFetch('/api/requests', 'POST', reqData);
@@ -315,7 +329,14 @@ export default function App() {
                 />
               )
             ) : currentTab === 'profile' ? (
-              <StudentProfile session={session} onSaveAddress={handleSaveProfileAddress} onLogout={handleLogout} themeMode={themeMode} onThemeChange={handleThemeChange} />
+              <StudentProfile
+                session={session}
+                onUpdateYear={handleUpdateYear}
+                onSaveAddress={handleSaveProfileAddress}
+                onLogout={handleLogout}
+                themeMode={themeMode}
+                onThemeChange={handleThemeChange}
+              />
             ) : (
               <StudentDashboard
                 session={session}

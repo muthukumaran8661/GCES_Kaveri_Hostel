@@ -39,8 +39,13 @@ router.put('/profile', protect, async (req, res) => {
       user.homeAddress = homeAddress.trim();
     }
 
-    // Protect department and year from student-side updates
-    if (userModel !== 'student' && user.role !== 'student') {
+    if (userModel === 'student' || user.role === 'student') {
+      // ONLY Year is editable for students. All other fields (Department, Name, Reg, Email, etc.) are strictly read-only!
+      if (year !== undefined) {
+        user.year = normalizeYear(year);
+      }
+    } else {
+      // Staff / Warden / Admin updates
       if (department !== undefined) {
         user.department = department.trim();
       }

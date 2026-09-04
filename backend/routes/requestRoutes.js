@@ -287,8 +287,8 @@ router.get('/student', protect, async (req, res) => {
         currentApprovalStage,
         qrToken: token || r.qrToken,
         qrStatus: status,
-        department: normalizeDepartment(req.user.department || r.department || ''),
-        year: normalizeYear(req.user.year || r.year || ''),
+        department: normalizeDepartment(r.department || r.studentDepartment || req.user.department || ''),
+        year: normalizeYear(r.year || r.studentYear || req.user.year || ''),
         studentPhone: req.user.phone || r.studentPhone || ''
       };
     }));
@@ -323,8 +323,8 @@ async function enrichRequestsWithStudentInfo(allRequests) {
       await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
     }
 
-    const reqDept = normalizeDepartment(u?.department || r.department || r.studentDepartment || '');
-    const reqYear = normalizeYear(u?.year || r.year || r.studentYear || '');
+    const reqDept = normalizeDepartment(r.department || r.studentDepartment || u?.department || '');
+    const reqYear = normalizeYear(r.year || r.studentYear || u?.year || '');
     const currentApprovalStage = r.currentApprovalStage || (
       r.status === 'pending_faculty' ? 'FACULTY' :
       r.status === 'pending_staff' ? 'WARDEN' :
