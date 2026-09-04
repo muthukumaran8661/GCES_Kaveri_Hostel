@@ -40,10 +40,48 @@ router.put('/profile', protect, async (req, res) => {
     }
 
     if (userModel === 'student' || user.role === 'student') {
-      // ONLY Year is editable for students. All other fields (Department, Name, Reg, Email, etc.) are strictly read-only!
+      // 1. Year is permanently editable for students
       if (year !== undefined) {
         user.year = normalizeYear(year);
       }
+
+      // 2. Allow completing missing Email ID ONLY if currently missing/empty
+      if (req.body.email !== undefined) {
+        const currentEmail = (user.email || '').trim();
+        if (!currentEmail) {
+          const cleanEmail = String(req.body.email).trim().toLowerCase();
+          if (!cleanEmail) {
+            return res.status(400).json({ success: false, message: 'Email ID is required.' });
+          }
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(cleanEmail)) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+          }
+          const existing = await Student.findOne({ email: cleanEmail, _id: { $ne: user._id } });
+          if (existing) {
+            return res.status(400).json({ success: false, message: 'This email ID is already registered.' });
+          }
+          user.email = cleanEmail;
+        }
+      }
+
+      // 3. Allow completing missing Phone Number ONLY if currently missing/empty
+      if (req.body.phone !== undefined) {
+        const currentPhone = (user.phone || '').trim();
+        if (!currentPhone) {
+          const rawPhone = String(req.body.phone).trim();
+          if (!rawPhone) {
+            return res.status(400).json({ success: false, message: 'Phone Number is required.' });
+          }
+          const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+          if (!/^[0-9]{10}$/.test(cleanPhone)) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+          }
+          user.phone = cleanPhone;
+        }
+      }
+
+      // Other fields (department, name, reg, room, studentId) remain strictly read-only for students!
     } else {
       // Staff / Warden / Admin updates
       if (department !== undefined) {

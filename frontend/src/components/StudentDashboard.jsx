@@ -589,6 +589,38 @@ export default function StudentDashboard({
 
   return (
     <>
+      {(!session?.email || !session?.phone) && (
+        <div
+          className="gkof-card"
+          style={{
+            background: 'var(--gold-soft, #FFFDF9)',
+            border: '2px solid var(--gold, #D4AF37)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 18px',
+            marginBottom: '16px',
+            borderRadius: '12px',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '22px' }}>⚠️</span>
+            <span style={{ fontWeight: 600, color: 'var(--maroon, #9E1B32)', fontSize: '14px' }}>
+              Please complete your required profile details.
+            </span>
+          </div>
+          <button
+            className="gkof-btn teal"
+            onClick={() => onNavigateTab && onNavigateTab('profile')}
+            style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 600 }}
+          >
+            Complete Profile →
+          </button>
+        </div>
+      )}
+
       <div className="gkof-stats">
         <div className="gkof-stat c1">
           <div className="n">{total}</div>

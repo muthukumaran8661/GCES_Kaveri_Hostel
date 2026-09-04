@@ -12,7 +12,15 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function StudentProfile({ session, onUpdateYear, onSaveAddress, onLogout, themeMode = 'system', onThemeChange }) {
+export default function StudentProfile({
+  session,
+  onUpdateYear,
+  onSaveMissingDetails,
+  onSaveAddress,
+  onLogout,
+  themeMode = 'system',
+  onThemeChange
+}) {
   const [address, setAddress] = useState(session.homeAddress || '');
   const [savedMsg, setSavedMsg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -23,6 +31,17 @@ export default function StudentProfile({ session, onUpdateYear, onSaveAddress, o
   const [savingYear, setSavingYear] = useState(false);
   const [yearSuccessMsg, setYearSuccessMsg] = useState('');
   const [yearErrorMsg, setYearErrorMsg] = useState('');
+
+  // Missing data state for existing accounts
+  const isEmailMissing = !session.email || session.email.trim() === '';
+  const isPhoneMissing = !session.phone || session.phone.trim() === '';
+  const hasMissingProfileDetails = isEmailMissing || isPhoneMissing;
+
+  const [inputEmail, setInputEmail] = useState('');
+  const [inputPhone, setInputPhone] = useState('');
+  const [savingMissing, setSavingMissing] = useState(false);
+  const [missingError, setMissingError] = useState('');
+  const [missingSuccessMsg, setMissingSuccessMsg] = useState('');
 
   const initial = (session.name || '?').trim().charAt(0).toUpperCase() || '?';
 
@@ -61,6 +80,56 @@ export default function StudentProfile({ session, onUpdateYear, onSaveAddress, o
     setYearErrorMsg('');
   };
 
+  const handleSaveMissingDetails = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      setSavingMissing(true);
+      setMissingError('');
+
+      const payload = {};
+      if (isEmailMissing) {
+        const clean = inputEmail.trim().toLowerCase();
+        if (!clean) {
+          setMissingError('Email ID is required.');
+          setSavingMissing(false);
+          return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(clean)) {
+          setMissingError('Please enter a valid email address.');
+          setSavingMissing(false);
+          return;
+        }
+        payload.email = clean;
+      }
+
+      if (isPhoneMissing) {
+        const clean = inputPhone.replace(/[^0-9]/g, '').slice(0, 10);
+        if (!clean) {
+          setMissingError('Phone Number is required.');
+          setSavingMissing(false);
+          return;
+        }
+        if (!/^[0-9]{10}$/.test(clean)) {
+          setMissingError('Please enter a valid phone number.');
+          setSavingMissing(false);
+          return;
+        }
+        payload.phone = clean;
+      }
+
+      if (onSaveMissingDetails) {
+        await onSaveMissingDetails(payload);
+        setMissingSuccessMsg('Required profile details saved successfully.');
+        setTimeout(() => { setMissingSuccessMsg(''); }, 4000);
+      }
+    } catch (err) {
+      setMissingError(err.message || 'Failed to save profile details.');
+    } finally {
+      setSavingMissing(false);
+    }
+  };
+
   const displayYear = normalizeYear(session.year);
 
   return (
@@ -70,6 +139,86 @@ export default function StudentProfile({ session, onUpdateYear, onSaveAddress, o
         <div className="gkof-profile-name">{session.name}</div>
         <div className="gkof-profile-role">Student · {session.department || 'CSE'} ({displayYear})</div>
       </div>
+
+      {/* PROMPT FOR EXISTING STUDENTS WITH MISSING EMAIL / PHONE */}
+      {hasMissingProfileDetails && (
+        <div
+          className="gkof-card"
+          style={{
+            border: '2px solid var(--gold, #D4AF37)',
+            background: 'var(--gold-soft, #FFFDF9)',
+            boxShadow: '0 4px 14px rgba(158, 27, 50, 0.08)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <span style={{ fontSize: '26px', lineHeight: 1 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: '0 0 6px 0', color: 'var(--maroon, #9E1B32)', fontSize: '16px', fontWeight: 700 }}>
+                Please complete your required profile details.
+              </h3>
+              <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: 'var(--ink-soft, #555)', lineHeight: 1.4 }}>
+                Your student account is missing mandatory contact information. Please provide your verified details below. Once saved, they will be permanently secured.
+              </p>
+
+              {missingError && (
+                <div style={{ color: 'var(--red, #9E1B32)', fontSize: '13px', fontWeight: 600, marginBottom: '12px', background: '#FDECEF', padding: '6px 12px', borderRadius: '6px', border: '1px solid #F5B5C2' }}>
+                  ⚠️ {missingError}
+                </div>
+              )}
+
+              {missingSuccessMsg && (
+                <div style={{ color: 'var(--green, #127A6E)', fontSize: '13px', fontWeight: 600, marginBottom: '12px', background: '#EAF6F4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #127A6E' }}>
+                  ✓ {missingSuccessMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveMissingDetails}>
+                {isEmailMissing && (
+                  <div className="gkof-field" style={{ marginBottom: '12px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '13px' }}>
+                      Email ID <span style={{ color: 'var(--red, #9E1B32)' }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="e.g. student@example.com"
+                      value={inputEmail}
+                      onChange={(e) => setInputEmail(e.target.value)}
+                      required
+                      style={{ padding: '8px 12px', width: '100%', borderRadius: '8px', border: '1.5px solid var(--gold, #D4AF37)' }}
+                    />
+                  </div>
+                )}
+
+                {isPhoneMissing && (
+                  <div className="gkof-field" style={{ marginBottom: '14px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '13px' }}>
+                      Phone Number (10 Digits) <span style={{ color: 'var(--red, #9E1B32)' }}>*</span>
+                    </label>
+                    <input
+                      placeholder="e.g. 9876543210"
+                      maxLength={10}
+                      inputMode="numeric"
+                      value={inputPhone}
+                      onChange={(e) => setInputPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                      required
+                      style={{ padding: '8px 12px', width: '100%', borderRadius: '8px', border: '1.5px solid var(--gold, #D4AF37)' }}
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="gkof-btn teal"
+                  disabled={savingMissing}
+                  style={{ padding: '8px 20px', fontSize: '13px', fontWeight: 700 }}
+                >
+                  {savingMissing ? 'Saving Details...' : 'Save Required Details'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="gkof-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
@@ -174,19 +323,19 @@ export default function StudentProfile({ session, onUpdateYear, onSaveAddress, o
         {/* Email ID - Read-only, no Edit button */}
         <div className="gkof-profile-row">
           <span className="k">Email ID</span>
-          <span className="v">{session.email || '—'}</span>
+          <span className="v">{session.email ? session.email : '—'}</span>
         </div>
 
-        {/* Phone Number - Read-only */}
+        {/* Phone Number - Read-only, no Edit button */}
         <div className="gkof-profile-row">
           <span className="k">Phone Number</span>
-          <span className="v">{session.phone || '—'}</span>
+          <span className="v">{session.phone ? session.phone : '—'}</span>
         </div>
 
         {/* Room Number - Read-only */}
         <div className="gkof-profile-row">
           <span className="k">Room Number</span>
-          <span className="v">{session.room || '—'}</span>
+          <span className="v">{session.room || session.roomNumber || '—'}</span>
         </div>
       </div>
 

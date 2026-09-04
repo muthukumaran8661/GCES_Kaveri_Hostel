@@ -83,6 +83,16 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ success: false, message: 'This email ID is already registered.' });
     }
 
+    // Phone Number validation (Mandatory, 10 digits)
+    const rawPhone = (phone || '').trim();
+    if (!rawPhone) {
+      return res.status(400).json({ success: false, message: 'Phone Number is required.' });
+    }
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    if (!/^[0-9]{10}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+    }
+
     const finalDepartment = normalizeDepartment(department);
     const finalYear = normalizeYear(year);
 
@@ -99,7 +109,7 @@ router.post('/signup', async (req, res) => {
       year: finalYear,
       status: 'active',
       email: cleanEmail,
-      phone: (phone || '').trim(),
+      phone: cleanPhone,
       homeAddress: (homeAddress || '').trim()
     });
 

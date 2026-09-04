@@ -233,6 +233,19 @@ export default function App() {
     }
   };
 
+  const handleSaveMissingDetails = async (payload) => {
+    try {
+      const res = await apiFetch('/api/users/profile', 'PUT', payload);
+      if (res && res.user) {
+        setSession(res.user);
+      }
+      return res;
+    } catch (err) {
+      console.error('Save missing details error:', err);
+      throw err;
+    }
+  };
+
   const handleSubmitRequest = async (reqData) => {
     try {
       const res = await apiFetch('/api/requests', 'POST', reqData);
@@ -332,6 +345,7 @@ export default function App() {
               <StudentProfile
                 session={session}
                 onUpdateYear={handleUpdateYear}
+                onSaveMissingDetails={handleSaveMissingDetails}
                 onSaveAddress={handleSaveProfileAddress}
                 onLogout={handleLogout}
                 themeMode={themeMode}

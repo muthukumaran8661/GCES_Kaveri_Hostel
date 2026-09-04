@@ -141,6 +141,16 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         setError('Please enter a valid email address.');
         return;
       }
+      const rawPhone = studentPhone.trim();
+      if (!rawPhone) {
+        setError('Phone Number is required.');
+        return;
+      }
+      const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+      if (!/^[0-9]{10}$/.test(cleanPhone)) {
+        setError('Please enter a valid phone number.');
+        return;
+      }
       onSignup({
         role: 'student',
         username: studentId.trim(),
@@ -152,7 +162,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
         department: department.trim(),
         year: year.trim(),
         email: cleanStudentEmail,
-        phone: studentPhone.trim(),
+        phone: cleanPhone,
         homeAddress: homeAddress.trim()
       });
     } else {
@@ -399,7 +409,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                     />
                   </div>
                   <div className="gkof-field">
-                    <label>Phone Number</label>
+                    <label>Phone Number <span style={{ color: 'var(--red)', fontSize: '13px' }}>*</span></label>
                     <input
                       placeholder="e.g. 9876543210"
                       maxLength={10}

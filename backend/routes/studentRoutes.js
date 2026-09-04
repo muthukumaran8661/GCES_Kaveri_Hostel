@@ -59,6 +59,31 @@ router.post('/', protect, protectWardenAllowlist, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Student with this Login ID or Register No already exists.' });
     }
 
+    // Email validation
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      return res.status(400).json({ success: false, message: 'Email ID is required.' });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+
+    // Phone validation
+    const rawPhone = (phone || '').trim();
+    if (!rawPhone) {
+      return res.status(400).json({ success: false, message: 'Phone Number is required.' });
+    }
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    if (!/^[0-9]{10}$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+    }
+
+    const emailExists = await Student.findOne({ email: cleanEmail });
+    if (emailExists) {
+      return res.status(400).json({ success: false, message: 'This email ID is already registered.' });
+    }
+
     const newStudent = await Student.create({
       name: name.trim(),
       username: normUsername,
@@ -69,8 +94,8 @@ router.post('/', protect, protectWardenAllowlist, async (req, res) => {
       room: (room || '').trim(),
       department: normalizeDepartment(department || ''),
       year: normalizeYear(year || ''),
-      email: (email || '').trim().toLowerCase(),
-      phone: (phone || '').trim(),
+      email: cleanEmail,
+      phone: cleanPhone,
       homeAddress: (homeAddress || '').trim(),
       role: 'student',
       status: 'active'
