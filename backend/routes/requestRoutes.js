@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const OutRequest = require('../models/OutRequest');
 const User = require('../models/User');
-const { protect, protectStaffOrFaculty, protectWardenAllowlist } = require('../middleware/authMiddleware');
+const { protect, protectWarden, protectFaculty, protectStaffOrFaculty } = require('../middleware/authMiddleware');
 const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } = require('../utils/normalization');
 
 function uid() {
@@ -216,11 +216,15 @@ router.post('/', protect, async (req, res) => {
     const request = await OutRequest.create({
       requestId,
       owner: req.user.username,
+      studentId: req.user.username,
       name: req.user.name,
       reg: req.user.reg || '',
       studentPhone: req.user.phone || '',
       department: studentDept,
       year: studentYear,
+      studentDepartment: studentDept,
+      studentYear: studentYear,
+      assignedFacultyAdvisorId: assignedFacultyId,
       assignedFacultyId,
       assignedWardenId,
       currentApprovalStage,
@@ -288,54 +292,138 @@ router.get('/student', protect, async (req, res) => {
   }
 });
 
+// Helper to enrich requests with fresh Student Profile & Status Information
+async function enrichRequestsWithStudentInfo(allRequests) {
+  const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name').lean();
+  const userMap = new Map();
+  studentUsers.forEach(u => {
+    if (u.username) userMap.set(u.username.toLowerCase(), u);
+    if (u.reg) userMap.set(u.reg.toLowerCase(), u);
+  });
+
+  return await Promise.all(allRequests.map(async r => {
+    const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
+    let token = r.qrToken;
+    let status = r.qrStatus || 'ACTIVE';
+
+    if (['approved_final', 'returned'].includes(r.status) && !token) {
+      token = `${r.requestId || 'REQ'}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
+      await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
+    }
+
+    const reqDept = normalizeDepartment(u?.department || r.department || r.studentDepartment || '');
+    const reqYear = normalizeYear(u?.year || r.year || r.studentYear || '');
+    const currentApprovalStage = r.currentApprovalStage || (
+      r.status === 'pending_faculty' ? 'FACULTY' :
+      r.status === 'pending_staff' ? 'WARDEN' :
+      r.status === 'notifying_parent' ? 'PARENT' :
+      r.status === 'approved_final' ? 'READY' :
+      r.status === 'returned' ? 'RETURNED' : 'REJECTED'
+    );
+
+    return {
+      ...r,
+      currentApprovalStage,
+      qrToken: token || r.qrToken,
+      qrStatus: status,
+      studentId: r.studentId || r.owner || '',
+      studentDepartment: reqDept,
+      studentYear: reqYear,
+      assignedFacultyAdvisorId: r.assignedFacultyAdvisorId || r.assignedFacultyId || null,
+      assignedWardenId: r.assignedWardenId || null,
+      department: reqDept,
+      year: reqYear,
+      studentPhone: u?.phone || r.studentPhone || ''
+    };
+  }));
+}
+
+// @route   GET /api/requests/warden
+// @desc    Get requests assigned to the logged-in Warden
+// @access  Private (Warden/Admin)
+router.get('/warden', protect, protectWarden, async (req, res) => {
+  try {
+    const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
+    const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
+
+    const wardenDept = normalizeDepartment(req.user.department);
+    const filtered = enrichedRequests.filter(r => {
+      if (req.user.role === 'admin') return true;
+
+      // Filter: student.department matches loggedInWarden.department (or general hostel administration)
+      if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
+        return false;
+      }
+
+      // Filter: student.year matches loggedInWarden.assignedYear
+      if (!matchesYear(req.user.year, r.year)) {
+        return false;
+      }
+
+      // Suppress weekday requests before Faculty Advisor approval
+      if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+        return false;
+      }
+
+      // Optional stage filter if query parameter is passed (e.g. ?stage=WARDEN)
+      if (req.query.stage && r.currentApprovalStage !== req.query.stage) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return res.json({ success: true, requests: filtered });
+  } catch (error) {
+    console.error('Get warden requests error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching warden requests.' });
+  }
+});
+
+// @route   GET /api/requests/faculty
+// @desc    Get requests assigned to the logged-in Faculty Advisor
+// @access  Private (Faculty Advisor)
+router.get('/faculty', protect, protectFaculty, async (req, res) => {
+  try {
+    const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
+    const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
+
+    const filtered = enrichedRequests.filter(r => {
+      // Filter: student.department matches loggedInFaculty.department
+      if (!matchesDepartment(req.user.department, r.department)) {
+        return false;
+      }
+
+      // Filter: student.year matches loggedInFaculty.assignedYear
+      if (!matchesYear(req.user.year, r.year)) {
+        return false;
+      }
+
+      // Optional stage filter if query parameter is passed (e.g. ?stage=FACULTY)
+      if (req.query.stage && r.currentApprovalStage !== req.query.stage) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return res.json({ success: true, requests: filtered });
+  } catch (error) {
+    console.error('Get faculty requests error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching faculty requests.' });
+  }
+});
+
 // @route   GET /api/requests/staff
-// @desc    Get all requests for staff/faculty dashboard queues
+// @desc    Backward compatible staff/faculty request endpoint with role-aware delegation
 // @access  Private (Staff/Faculty/Admin)
 router.get('/staff', protect, protectStaffOrFaculty, async (req, res) => {
   try {
     const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
+    const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
 
-    // Enrich requests with latest student User profile database data
-    const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name').lean();
-    const userMap = new Map();
-    studentUsers.forEach(u => {
-      if (u.username) userMap.set(u.username.toLowerCase(), u);
-      if (u.reg) userMap.set(u.reg.toLowerCase(), u);
-    });
-
-    const enrichedRequests = await Promise.all(allRequests.map(async r => {
-      const u = userMap.get((r.owner || '').toLowerCase()) || userMap.get((r.reg || '').toLowerCase());
-      let token = r.qrToken;
-      let status = r.qrStatus || 'ACTIVE';
-
-      if (['approved_final', 'returned'].includes(r.status) && !token) {
-        token = `${r.requestId || 'REQ'}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-        status = r.status === 'returned' ? 'RETURNED' : 'ACTIVE';
-        await OutRequest.updateOne({ _id: r._id }, { $set: { qrToken: token, qrStatus: status } });
-      }
-
-      const reqDept = normalizeDepartment(u?.department || r.department || '');
-      const reqYear = normalizeYear(u?.year || r.year || '');
-      const currentApprovalStage = r.currentApprovalStage || (
-        r.status === 'pending_faculty' ? 'FACULTY' :
-        r.status === 'pending_staff' ? 'WARDEN' :
-        r.status === 'notifying_parent' ? 'PARENT' :
-        r.status === 'approved_final' ? 'READY' :
-        r.status === 'returned' ? 'RETURNED' : 'REJECTED'
-      );
-
-      return {
-        ...r,
-        currentApprovalStage,
-        qrToken: token || r.qrToken,
-        qrStatus: status,
-        department: reqDept,
-        year: reqYear,
-        studentPhone: u?.phone || r.studentPhone || ''
-      };
-    }));
-
-    // Dynamic Faculty Filter: Faculty members ONLY see requests matching their assigned Department + Year
+    // Role-aware delegation for Faculty Advisor
     if (req.user.role === 'faculty') {
       const filtered = enrichedRequests.filter(r => {
         return matchesDepartment(req.user.department, r.department) &&
@@ -344,25 +432,17 @@ router.get('/staff', protect, protectStaffOrFaculty, async (req, res) => {
       return res.json({ success: true, requests: filtered });
     }
 
-    // Dynamic Warden Filter: Wardens ONLY see requests matching their assigned Student Year
-    // (and Department if specifically configured, otherwise general hostel administration)
-    // AND Wardens MUST NOT see weekday requests before Faculty Advisor approval (pending_faculty / stage FACULTY)
+    // Role-aware delegation for Warden (Staff)
     if (req.user.role === 'staff') {
+      const wardenDept = normalizeDepartment(req.user.department);
       const filtered = enrichedRequests.filter(r => {
-        // Check year match
         if (!matchesYear(req.user.year, r.year)) return false;
-
-        // Check department match if warden is department-specific
-        const wardenDept = normalizeDepartment(req.user.department);
         if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
           return false;
         }
-
-        // MUST NOT RECEIVE EARLY: Weekday requests pending faculty approval stay strictly with Faculty Advisor
         if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
           return false;
         }
-
         return true;
       });
       return res.json({ success: true, requests: filtered });
@@ -448,6 +528,18 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
         request.currentApprovalStage = 'WARDEN';
         request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
+        request.facultyAdvisorApprovedAt = new Date();
+        // Dynamically find and store assignedWardenId for the student's department and year
+        {
+          const activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
+          const matchedWardens = activeWardens.filter(u =>
+            (matchesDepartment(u.department, request.department) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
+            matchesYear(u.year, request.year)
+          );
+          if (matchedWardens.length > 0) {
+            request.assignedWardenId = matchedWardens[0]._id;
+          }
+        }
         request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Approved — forwarded to Warden`);
         break;
       case 'faculty_rejected':
@@ -463,6 +555,7 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
         request.currentApprovalStage = 'PARENT';
         request.wardenActionBy = req.user.name || req.user.username;
         request.wardenActionAt = new Date();
+        request.wardenApprovedAt = new Date();
         request.callAttempts = 1;
         request.log.push(`Warden (${req.user.name}) approved — SMS/WhatsApp link sent, auto-call started (attempt 1)`);
         break;
@@ -477,6 +570,7 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
       case 'parent_approved':
         request.status = 'approved_final';
         request.currentApprovalStage = 'READY';
+        request.parentApprovedAt = new Date();
         if (!request.qrToken) {
           const randHex = crypto.randomBytes(3).toString('hex').toUpperCase();
           request.qrToken = `${request.requestId || 'REQ'}-${randHex}`;

@@ -84,6 +84,23 @@ const OutRequestSchema = new mongoose.Schema({
     enum: ['FACULTY', 'WARDEN', 'PARENT', 'READY', 'REJECTED', 'CANCELLED', 'RETURNED'],
     default: 'FACULTY'
   },
+  studentId: {
+    type: String,
+    default: ''
+  },
+  studentDepartment: {
+    type: String,
+    default: ''
+  },
+  studentYear: {
+    type: String,
+    default: ''
+  },
+  assignedFacultyAdvisorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   assignedFacultyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -108,12 +125,24 @@ const OutRequestSchema = new mongoose.Schema({
   facultyActionAt: {
     type: Date
   },
+  facultyAdvisorApprovedAt: {
+    type: Date,
+    default: null
+  },
   wardenActionBy: {
     type: String,
     default: ''
   },
   wardenActionAt: {
     type: Date
+  },
+  wardenApprovedAt: {
+    type: Date,
+    default: null
+  },
+  parentApprovedAt: {
+    type: Date,
+    default: null
   },
   rejectionReason: {
     type: String,

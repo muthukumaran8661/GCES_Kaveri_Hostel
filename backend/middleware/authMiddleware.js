@@ -92,6 +92,8 @@ const protectStaffOrFaculty = (req, res, next) => {
 
 module.exports = {
   protect,
+  protectWarden: protectWardenAllowlist,
+  protectFaculty: protectFacultyAllowlist,
   protectWardenAllowlist,
   protectFacultyAllowlist,
   protectStaffOrFaculty,

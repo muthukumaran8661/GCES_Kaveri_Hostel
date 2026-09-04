@@ -158,7 +158,12 @@ export default function App() {
   async function fetchRequestsForUser(user) {
     if (!user) return;
     try {
-      const endpoint = ['staff', 'faculty', 'admin'].includes(user.role) ? '/api/requests/staff' : '/api/requests/student';
+      let endpoint = '/api/requests/student';
+      if (user.role === 'faculty') {
+        endpoint = '/api/requests/faculty';
+      } else if (user.role === 'staff' || user.role === 'admin') {
+        endpoint = '/api/requests/warden';
+      }
       const res = await apiFetch(endpoint);
       setRequests(res.requests || []);
     } catch (e) {

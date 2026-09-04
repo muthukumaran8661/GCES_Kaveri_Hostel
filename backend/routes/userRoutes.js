@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
+const { protect, protectWardenAllowlist, protectStaffOrFaculty } = require('../middleware/authMiddleware');
 const { normalizeDepartment, normalizeYear } = require('../utils/normalization');
 
 // @route   PUT /api/users/profile
@@ -126,7 +126,7 @@ function sortStaffUsers(users) {
 // @route   GET /api/users/staff-list
 // @desc    Get list of all faculty and staff users for Admin management
 // @access  Private (Staff/Faculty/Admin)
-router.get('/staff-list', protect, protectWardenAllowlist, async (req, res) => {
+router.get('/staff-list', protect, protectStaffOrFaculty, async (req, res) => {
   try {
     if (!['staff', 'faculty', 'admin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied.' });
