@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "React frontend for GCES Kaveri Hostel Out Pass Portal",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
