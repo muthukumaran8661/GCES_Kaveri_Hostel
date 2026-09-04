@@ -21,7 +21,12 @@ async function apiFetch(endpoint, method = 'GET', data = null) {
   }
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
   const res = await fetch(url, config);
-  const result = await res.json();
+  let result = {};
+  try {
+    result = await res.json();
+  } catch (parseErr) {
+    result = { message: res.statusText || 'API request failed' };
+  }
   if (!res.ok) {
     const error = new Error(result.message || 'API request failed');
     error.status = res.status;
@@ -135,9 +140,21 @@ export default function App() {
           setSession(res.user);
           await fetchRequestsForUser(res.user);
         } catch (e) {
-          console.warn('Session verification failed, logging out:', e);
-          localStorage.removeItem('gkof_token');
-          setSession(null);
+          if (e.status === 401) {
+            console.warn('Session expired or invalid (401), logging out:', e.message);
+            localStorage.removeItem('gkof_token');
+            setSession(null);
+            setAuthError('Session expired. Please log in again.');
+          } else if (e.status === 403) {
+            console.warn('Access denied (403):', e.message);
+            setAuthError(e.message || 'Access Denied: Your account is currently inactive.');
+          } else if (e.status >= 500) {
+            console.error('Server error verifying session (500):', e.message);
+            setAuthError('Server error verifying session. Retrying...');
+          } else {
+            console.error('Network error verifying session:', e.message);
+            setAuthError('Network error connecting to server. Please check your connection.');
+          }
         }
       }
     } catch (e) {
@@ -219,11 +236,25 @@ export default function App() {
     }
   };
 
+  const handleUpdateDepartment = async (newDepartment) => {
+    try {
+      const res = await apiFetch('/api/students/profile/department', 'PATCH', { department: newDepartment });
+      if (res && (res.user || res.student)) {
+        setSession(res.user || res.student);
+      }
+      return res;
+    } catch (err) {
+      console.error('Update department error:', err);
+      alert(err.message || 'Failed to update Department');
+      throw err;
+    }
+  };
+
   const handleUpdateYear = async (newYear) => {
     try {
-      const res = await apiFetch('/api/users/profile', 'PUT', { year: newYear });
-      if (res && res.user) {
-        setSession(res.user);
+      const res = await apiFetch('/api/students/profile/year', 'PATCH', { year: newYear });
+      if (res && (res.user || res.student)) {
+        setSession(res.user || res.student);
       }
       return res;
     } catch (err) {
@@ -344,6 +375,7 @@ export default function App() {
             ) : currentTab === 'profile' ? (
               <StudentProfile
                 session={session}
+                onUpdateDepartment={handleUpdateDepartment}
                 onUpdateYear={handleUpdateYear}
                 onSaveMissingDetails={handleSaveMissingDetails}
                 onSaveAddress={handleSaveProfileAddress}

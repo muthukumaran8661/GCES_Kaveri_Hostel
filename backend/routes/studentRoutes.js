@@ -4,6 +4,11 @@ const Student = require('../models/Student');
 const { protect, protectWardenAllowlist } = require('../middleware/authMiddleware');
 const { normalizeDepartment, normalizeYear } = require('../utils/normalization');
 
+// Allowed department options
+const ALLOWED_DEPTS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Maths', 'Physics', 'English', 'Chemistry', 'Mechatronics'];
+const ALLOWED_DEPTS_UPPER = ALLOWED_DEPTS.map(d => d.toUpperCase());
+const ALLOWED_YEARS = ['I Year', 'II Year', 'III Year', 'IV Year'];
+
 // @route   GET /api/students/profile
 // @desc    Get currently logged in student profile
 // @access  Private (Student)
@@ -19,6 +24,161 @@ router.get('/profile', protect, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error fetching student profile.' });
   }
 });
+
+// @route   PATCH /api/students/profile/department
+// @desc    Update authenticated student's department
+// @access  Private (Student)
+router.patch('/profile/department', protect, async (req, res) => {
+  try {
+    const { department } = req.body;
+    if (!department || typeof department !== 'string' || !department.trim()) {
+      return res.status(400).json({ success: false, message: 'Department is required.' });
+    }
+
+    const trimmedDept = department.trim();
+    const normalizedUpper = normalizeDepartment(trimmedDept);
+
+    const matchedIdx = ALLOWED_DEPTS_UPPER.indexOf(normalizedUpper);
+    if (matchedIdx === -1) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid department. Allowed departments: ${ALLOWED_DEPTS.join(', ')}`
+      });
+    }
+
+    const canonicalDept = ALLOWED_DEPTS[matchedIdx];
+    const studentId = req.user._id || req.user.id;
+
+    let student = await Student.findById(studentId);
+    if (!student) {
+      student = await Student.findOne({ username: req.user.username });
+    }
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student account not found.' });
+    }
+
+    student.department = canonicalDept;
+    await student.save();
+
+    // Also sync with legacy User collection if record exists
+    try {
+      const User = require('../models/User');
+      await User.updateOne(
+        { $or: [{ _id: student._id }, { username: student.username }] },
+        { $set: { department: canonicalDept } }
+      );
+    } catch (e) {
+      // ignore legacy error
+    }
+
+    const updatedUser = {
+      id: student._id,
+      _id: student._id,
+      name: student.name,
+      username: student.username,
+      role: 'student',
+      originalRole: student.role || 'student',
+      reg: student.reg || student.registerNumber || '',
+      registerNumber: student.registerNumber || student.reg || '',
+      studentId: student.studentId || student.username,
+      room: student.room || '',
+      department: student.department,
+      year: student.year,
+      assignedYear: student.year,
+      email: student.email || '',
+      phone: student.phone || '',
+      homeAddress: student.homeAddress || '',
+      status: student.status
+    };
+
+    return res.json({
+      success: true,
+      message: 'Department updated successfully.',
+      user: updatedUser,
+      student: updatedUser
+    });
+  } catch (error) {
+    console.error('Update student department error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating department.' });
+  }
+});
+
+// @route   PATCH /api/students/profile/year
+// @desc    Update authenticated student's academic year
+// @access  Private (Student)
+router.patch('/profile/year', protect, async (req, res) => {
+  try {
+    const { year } = req.body;
+    if (!year || typeof year !== 'string' || !year.trim()) {
+      return res.status(400).json({ success: false, message: 'Year is required.' });
+    }
+
+    const normalizedY = normalizeYear(year);
+    if (!ALLOWED_YEARS.includes(normalizedY)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid year. Allowed values: ${ALLOWED_YEARS.join(', ')}`
+      });
+    }
+
+    const studentId = req.user._id || req.user.id;
+
+    let student = await Student.findById(studentId);
+    if (!student) {
+      student = await Student.findOne({ username: req.user.username });
+    }
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student account not found.' });
+    }
+
+    student.year = normalizedY;
+    await student.save();
+
+    // Also sync with legacy User collection if record exists
+    try {
+      const User = require('../models/User');
+      await User.updateOne(
+        { $or: [{ _id: student._id }, { username: student.username }] },
+        { $set: { year: normalizedY, assignedYear: normalizedY } }
+      );
+    } catch (e) {
+      // ignore legacy error
+    }
+
+    const updatedUser = {
+      id: student._id,
+      _id: student._id,
+      name: student.name,
+      username: student.username,
+      role: 'student',
+      originalRole: student.role || 'student',
+      reg: student.reg || student.registerNumber || '',
+      registerNumber: student.registerNumber || student.reg || '',
+      studentId: student.studentId || student.username,
+      room: student.room || '',
+      department: student.department,
+      year: student.year,
+      assignedYear: student.year,
+      email: student.email || '',
+      phone: student.phone || '',
+      homeAddress: student.homeAddress || '',
+      status: student.status
+    };
+
+    return res.json({
+      success: true,
+      message: 'Year updated successfully.',
+      user: updatedUser,
+      student: updatedUser
+    });
+  } catch (error) {
+    console.error('Update student year error:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating year.' });
+  }
+});
+
 
 // @route   GET /api/students
 // @desc    List all students for Admin Control

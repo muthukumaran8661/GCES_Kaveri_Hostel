@@ -3,15 +3,17 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+
+// Load env vars from backend/.env or parent env FIRST
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config();
+
 const connectDB = require('./config/db');
 const { seedWardenAccounts } = require('./config/seedWardens');
 const { seedFacultyAccounts } = require('./config/seedFaculty');
 const { runMigration } = require('./scripts/migrate_to_collections');
 const { getFromAddress } = require('./utils/mailer');
 
-// Load env vars from backend/.env or parent env
-dotenv.config({ path: path.join(__dirname, '.env') });
-dotenv.config();
 
 // Connect to Database, Run Migration, & Seed Fixed Accounts
 connectDB().then(async () => {

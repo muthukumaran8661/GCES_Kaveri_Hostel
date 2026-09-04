@@ -12,8 +12,22 @@ function normalizeYear(y) {
   return s;
 }
 
+const DEPARTMENT_OPTIONS = [
+  'CSE',
+  'ECE',
+  'EEE',
+  'Mechanical',
+  'Civil',
+  'Maths',
+  'Physics',
+  'English',
+  'Chemistry',
+  'Mechatronics'
+];
+
 export default function StudentProfile({
   session,
+  onUpdateDepartment,
   onUpdateYear,
   onSaveMissingDetails,
   onSaveAddress,
@@ -24,6 +38,13 @@ export default function StudentProfile({
   const [address, setAddress] = useState(session.homeAddress || '');
   const [savedMsg, setSavedMsg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Department Edit state
+  const [isEditingDept, setIsEditingDept] = useState(false);
+  const [selectedDept, setSelectedDept] = useState(session.department || 'CSE');
+  const [savingDept, setSavingDept] = useState(false);
+  const [deptSuccessMsg, setDeptSuccessMsg] = useState('');
+  const [deptErrorMsg, setDeptErrorMsg] = useState('');
 
   // Year Edit state
   const [isEditingYear, setIsEditingYear] = useState(false);
@@ -46,6 +67,12 @@ export default function StudentProfile({
   const initial = (session.name || '?').trim().charAt(0).toUpperCase() || '?';
 
   useEffect(() => {
+    if (!isEditingDept) {
+      setSelectedDept(session.department || 'CSE');
+    }
+  }, [session.department, isEditingDept]);
+
+  useEffect(() => {
     if (!isEditingYear) {
       setSelectedYear(normalizeYear(session.year));
     }
@@ -55,6 +82,29 @@ export default function StudentProfile({
     await onSaveAddress(address.trim());
     setSavedMsg(true);
     setTimeout(() => { setSavedMsg(false); }, 1800);
+  };
+
+  const handleSaveDept = async () => {
+    try {
+      setSavingDept(true);
+      setDeptErrorMsg('');
+      if (onUpdateDepartment) {
+        await onUpdateDepartment(selectedDept);
+      }
+      setIsEditingDept(false);
+      setDeptSuccessMsg('Department updated successfully.');
+      setTimeout(() => { setDeptSuccessMsg(''); }, 3500);
+    } catch (err) {
+      setDeptErrorMsg(err.message || 'Failed to update Department.');
+    } finally {
+      setSavingDept(false);
+    }
+  };
+
+  const handleCancelDept = () => {
+    setSelectedDept(session.department || 'CSE');
+    setIsEditingDept(false);
+    setDeptErrorMsg('');
   };
 
   const handleSaveYear = async () => {
@@ -79,6 +129,7 @@ export default function StudentProfile({
     setIsEditingYear(false);
     setYearErrorMsg('');
   };
+
 
   const handleSaveMissingDetails = async (e) => {
     if (e) e.preventDefault();
@@ -223,6 +274,16 @@ export default function StudentProfile({
       <div className="gkof-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ margin: 0 }}>Personal Details</h3>
+          {deptSuccessMsg && (
+            <span style={{ color: 'var(--green, #127A6E)', fontSize: '12.5px', fontWeight: 600, background: 'var(--gold-soft, #EAF6F4)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--green, #127A6E)' }}>
+              ✓ {deptSuccessMsg}
+            </span>
+          )}
+          {deptErrorMsg && (
+            <span style={{ color: 'var(--red, #9E1B32)', fontSize: '12.5px', fontWeight: 600 }}>
+              {deptErrorMsg}
+            </span>
+          )}
           {yearSuccessMsg && (
             <span style={{ color: 'var(--green, #127A6E)', fontSize: '12.5px', fontWeight: 600, background: 'var(--gold-soft, #EAF6F4)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--green, #127A6E)' }}>
               ✓ {yearSuccessMsg}
@@ -253,13 +314,74 @@ export default function StudentProfile({
           <span className="v">{session.studentId || session.username || '—'}</span>
         </div>
 
-        {/* Department - Read-only */}
-        <div className="gkof-profile-row">
+        {/* Department - Editable */}
+        <div className="gkof-profile-row" style={{ alignItems: 'center' }}>
           <span className="k">Department</span>
-          <span className="v">{session.department || '—'}</span>
+          {isEditingDept ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                disabled={savingDept}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--gold, #D4AF37)',
+                  background: 'var(--card-bg, #fff)',
+                  color: 'var(--ink, #1F1B24)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                {DEPARTMENT_OPTIONS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="gkof-btn teal"
+                onClick={handleSaveDept}
+                disabled={savingDept}
+                style={{ padding: '5px 14px', fontSize: '12px' }}
+              >
+                {savingDept ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                className="gkof-btn ghost"
+                onClick={handleCancelDept}
+                disabled={savingDept}
+                style={{ padding: '5px 12px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="v" style={{ fontWeight: 700 }}>{session.department || '—'}</span>
+              <button
+                className="gkof-btn ghost"
+                onClick={() => {
+                  setIsEditingDept(true);
+                  setIsEditingYear(false);
+                  setDeptSuccessMsg('');
+                  setDeptErrorMsg('');
+                }}
+                style={{
+                  padding: '3px 10px',
+                  fontSize: '12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--gold-soft, #D4AF37)'
+                }}
+              >
+                Edit
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Year - ONLY Year is Editable */}
+        {/* Year - Editable */}
         <div className="gkof-profile-row" style={{ alignItems: 'center' }}>
           <span className="k">Year</span>
           {isEditingYear ? (
@@ -306,7 +428,12 @@ export default function StudentProfile({
               <span className="v" style={{ fontWeight: 700 }}>{displayYear}</span>
               <button
                 className="gkof-btn ghost"
-                onClick={() => { setIsEditingYear(true); setYearSuccessMsg(''); setYearErrorMsg(''); }}
+                onClick={() => {
+                  setIsEditingYear(true);
+                  setIsEditingDept(false);
+                  setYearSuccessMsg('');
+                  setYearErrorMsg('');
+                }}
                 style={{
                   padding: '3px 10px',
                   fontSize: '12px',
