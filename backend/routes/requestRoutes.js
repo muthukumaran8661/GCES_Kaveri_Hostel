@@ -3,7 +3,10 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const OutRequest = require('../models/OutRequest');
-const User = require('../models/User');
+const Student = require('../models/Student');
+const Staff = require('../models/Staff');
+const Warden = require('../models/Warden');
+const User = require('../models/User'); // fallback
 const { protect, protectWarden, protectFaculty, protectStaffOrFaculty } = require('../middleware/authMiddleware');
 const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } = require('../utils/normalization');
 
@@ -160,24 +163,28 @@ router.post('/', protect, async (req, res) => {
     const studentDept = normalizeDepartment(req.user.department || department);
     const studentYear = normalizeYear(req.user.year || year);
 
-    // Query active Faculty and Wardens
-    const activeStaffUsers = await User.find({
-      role: { $in: ['faculty', 'staff'] },
-      status: 'active'
-    }).lean();
+    // Query active Faculty from Staff collection
+    let activeStaffUsers = await Staff.find({ status: 'active' }).lean();
+    if (!activeStaffUsers || activeStaffUsers.length === 0) {
+      activeStaffUsers = await User.find({ role: 'faculty', status: 'active' }).lean();
+    }
+
+    // Query active Wardens from Warden collection
+    let activeWardens = await Warden.find({ status: 'active' }).lean();
+    if (!activeWardens || activeWardens.length === 0) {
+      activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
+    }
 
     // Match Faculty Advisors for this student's Department and Year
     const matchedFaculties = activeStaffUsers.filter(u =>
-      u.role === 'faculty' &&
       matchesDepartment(u.department, studentDept) &&
-      matchesYear(u.year, studentYear)
+      matchesYear(u.assignedYear || u.year, studentYear)
     );
 
     // Match Wardens for this student's Year and Department (or general hostel administration)
-    const matchedWardens = activeStaffUsers.filter(u =>
-      u.role === 'staff' &&
+    const matchedWardens = activeWardens.filter(u =>
       (matchesDepartment(u.department, studentDept) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
-      matchesYear(u.year, studentYear)
+      matchesYear(u.assignedYear || u.year, studentYear)
     );
 
     console.log(`[ROUTING] Student Dept: ${studentDept}, Year: ${studentYear}`);
@@ -294,11 +301,15 @@ router.get('/student', protect, async (req, res) => {
 
 // Helper to enrich requests with fresh Student Profile & Status Information
 async function enrichRequestsWithStudentInfo(allRequests) {
-  const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name').lean();
+  let studentUsers = await Student.find().select('username reg registerNumber department year phone name').lean();
+  if (!studentUsers || studentUsers.length === 0) {
+    studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name').lean();
+  }
   const userMap = new Map();
   studentUsers.forEach(u => {
     if (u.username) userMap.set(u.username.toLowerCase(), u);
     if (u.reg) userMap.set(u.reg.toLowerCase(), u);
+    if (u.registerNumber) userMap.set(u.registerNumber.toLowerCase(), u);
   });
 
   return await Promise.all(allRequests.map(async r => {
@@ -529,12 +540,15 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
         request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
         request.facultyAdvisorApprovedAt = new Date();
-        // Dynamically find and store assignedWardenId for the student's department and year
+        // Dynamically find and store assignedWardenId from Warden collection for student's department and year
         {
-          const activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
+          let activeWardens = await Warden.find({ status: 'active' }).lean();
+          if (!activeWardens || activeWardens.length === 0) {
+            activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
+          }
           const matchedWardens = activeWardens.filter(u =>
             (matchesDepartment(u.department, request.department) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
-            matchesYear(u.year, request.year)
+            matchesYear(u.assignedYear || u.year, request.year)
           );
           if (matchedWardens.length > 0) {
             request.assignedWardenId = matchedWardens[0]._id;
@@ -619,12 +633,16 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
 router.get('/report', protect, protectStaffOrFaculty, async (req, res) => {
   try {
     const allRequests = await OutRequest.find().sort({ createdAt: -1 }).lean();
-    const studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name room homeAddress').lean();
+    let studentUsers = await Student.find().select('username reg registerNumber department year phone name room homeAddress').lean();
+    if (!studentUsers || studentUsers.length === 0) {
+      studentUsers = await User.find({ role: 'student' }).select('username reg department year phone name room homeAddress').lean();
+    }
     
     const userMap = new Map();
     studentUsers.forEach(u => {
       if (u.username) userMap.set(u.username.toLowerCase(), u);
       if (u.reg) userMap.set(u.reg.toLowerCase(), u);
+      if (u.registerNumber) userMap.set(u.registerNumber.toLowerCase(), u);
     });
 
     const enriched = allRequests.map(r => {

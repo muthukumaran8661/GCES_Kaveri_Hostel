@@ -1,8 +1,10 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const Student = require('../models/Student');
+const Staff = require('../models/Staff');
+const Warden = require('../models/Warden');
+const User = require('../models/User'); // fallback for migration safety
 
 const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123'];
-
 const FACULTY_ALLOWLIST_USERNAMES = [];
 
 const protect = async (req, res, next) => {
@@ -12,12 +14,68 @@ const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key');
-      req.user = await User.findById(decoded.id).select('-password');
-      if (!req.user) {
-        return res.status(401).json({ success: false, message: 'User not found' });
+      const userId = decoded.id || decoded.userId;
+
+      let foundUser = null;
+      let userRole = decoded.role ? String(decoded.role).toLowerCase() : null;
+
+      // 1. Role-directed lookup first
+      if (userRole === 'student') {
+        foundUser = await Student.findById(userId).select('-password');
+      } else if (userRole === 'faculty' || userRole === 'faculty advisor') {
+        foundUser = await Staff.findById(userId).select('-password');
+      } else if (userRole === 'warden' || userRole === 'staff' || userRole === 'admin') {
+        foundUser = await Warden.findById(userId).select('-password');
       }
+
+      // 2. Fallback search across all collections if not found by role-hint
+      if (!foundUser) {
+        foundUser = await Student.findById(userId).select('-password');
+      }
+      if (!foundUser) {
+        foundUser = await Staff.findById(userId).select('-password');
+      }
+      if (!foundUser) {
+        foundUser = await Warden.findById(userId).select('-password');
+      }
+      if (!foundUser) {
+        // Last-resort fallback to legacy User collection
+        foundUser = await User.findById(userId).select('-password');
+      }
+
+      if (!foundUser) {
+        return res.status(401).json({ success: false, message: 'User not found.' });
+      }
+
+      // 3. Normalize user attributes for seamless compatibility across application
+      const rawObj = foundUser.toObject ? foundUser.toObject() : foundUser;
+      const effectiveRole = String(rawObj.role || '').toLowerCase();
+
+      let normalizedRole = 'student';
+      if (effectiveRole === 'admin') {
+        normalizedRole = 'admin';
+      } else if (['faculty', 'faculty advisor'].includes(effectiveRole) || foundUser.collection.name === 'staff') {
+        normalizedRole = 'faculty';
+      } else if (['staff', 'warden'].includes(effectiveRole) || foundUser.collection.name === 'wardens') {
+        normalizedRole = 'staff';
+      }
+
+      const assignedYear = rawObj.assignedYear || rawObj.year || '';
+
+      req.user = {
+        ...rawObj,
+        _id: foundUser._id,
+        id: foundUser._id,
+        role: normalizedRole,
+        originalRole: rawObj.role,
+        assignedYear,
+        year: assignedYear,
+        department: rawObj.department || ''
+      };
+
       return next();
     } catch (error) {
+      console.error('Auth middleware token error:', error.message);
       return res.status(401).json({ success: false, message: 'Not authorized, token invalid or expired' });
     }
   }
@@ -32,7 +90,10 @@ const protectWardenAllowlist = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
   }
 
-  if (['staff', 'admin'].includes(req.user.role)) {
+  const role = (req.user.role || '').toLowerCase();
+  const origRole = (req.user.originalRole || '').toLowerCase();
+
+  if (role === 'staff' || role === 'admin' || origRole === 'warden' || origRole === 'staff' || origRole === 'admin') {
     if (req.user.status === 'inactive') {
       return res.status(403).json({
         success: false,
@@ -53,7 +114,10 @@ const protectFacultyAllowlist = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
   }
 
-  if (req.user.role === 'faculty') {
+  const role = (req.user.role || '').toLowerCase();
+  const origRole = (req.user.originalRole || '').toLowerCase();
+
+  if (role === 'faculty' || origRole === 'faculty advisor' || origRole === 'faculty') {
     if (req.user.status === 'inactive') {
       return res.status(403).json({
         success: false,
@@ -74,7 +138,11 @@ const protectStaffOrFaculty = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Not authorized, no user session found.' });
   }
 
-  if (['staff', 'faculty', 'admin'].includes(req.user.role)) {
+  const role = (req.user.role || '').toLowerCase();
+  const origRole = (req.user.originalRole || '').toLowerCase();
+  const allowed = ['staff', 'faculty', 'admin', 'warden', 'faculty advisor'];
+
+  if (allowed.includes(role) || allowed.includes(origRole)) {
     if (req.user.status === 'inactive') {
       return res.status(403).json({
         success: false,

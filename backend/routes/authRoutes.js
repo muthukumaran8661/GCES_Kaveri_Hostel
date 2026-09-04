@@ -1,20 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const Student = require('../models/Student');
+const Staff = require('../models/Staff');
+const Warden = require('../models/Warden');
+const User = require('../models/User'); // fallback
 const { protect, WARDEN_ALLOWLIST_USERNAMES, FACULTY_ALLOWLIST_USERNAMES } = require('../middleware/authMiddleware');
 const { sendEmail } = require('../utils/mailer');
 const { normalizeDepartment, normalizeYear } = require('../utils/normalization');
 
-
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key', {
+const generateToken = (user, effectiveRole) => {
+  const role = effectiveRole || user.role;
+  const assignedYear = user.assignedYear || user.year || '';
+  return jwt.sign({
+    id: user._id,
+    userId: user._id,
+    role,
+    department: user.department || '',
+    assignedYear
+  }, process.env.JWT_SECRET || 'gces_kaveri_hostel_secret_key', {
     expiresIn: '30d'
   });
 };
 
 // @route   POST /api/auth/signup
-// @desc    Register a new student user
+// @desc    Register a new student user in students collection
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
@@ -33,87 +43,72 @@ router.post('/signup', async (req, res) => {
 
     const normalizedUsername = username.trim().toLowerCase();
 
-    // Check if user already exists
-    const userExists = await User.findOne({ username: normalizedUsername });
+    // Check if student already exists in students collection
+    const userExists = await Student.findOne({
+      $or: [
+        { username: normalizedUsername },
+        { studentId: new RegExp('^' + normalizedUsername + '$', 'i') },
+        { reg: normalizedUsername },
+        { registerNumber: normalizedUsername }
+      ]
+    });
+
     if (userExists) {
       return res.status(400).json({
         success: false,
-        message: role === 'student'
-          ? 'That Student ID is already registered — log in instead.'
-          : 'That Warden/Admin/Faculty ID is already registered — log in instead.'
+        message: 'That Student ID / Register No is already registered — log in instead.'
       });
     }
 
-    let finalDepartment = (department || '').trim();
-    let finalYear = (year || '').trim();
-
-    // Additional validations & department enforcement
-    if (role === 'student') {
-      if (!/^8301[0-9]{8}$/.test(reg)) {
-        return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
-      }
-      if (!/^[0-9]+$/.test(room)) {
-        return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
-      }
-      finalDepartment = normalizeDepartment(department);
-      finalYear = normalizeYear(year);
-    } else if (role === 'staff' || role === 'admin') {
-      if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
-        return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
-      }
-      if (!finalDepartment) {
-        finalDepartment = 'Hostel Administration';
-      }
-    } else if (role === 'faculty') {
-      if (!name || !name.trim()) {
-        return res.status(400).json({ success: false, message: 'Faculty Name is required.' });
-      }
-      if (phone && !/^[0-9]{10}$/.test(phone.trim())) {
-        return res.status(400).json({ success: false, message: 'Phone number must be exactly 10 digits.' });
-      }
-      finalDepartment = normalizeDepartment(department);
-      finalYear = normalizeYear(year);
+    if (!/^8301[0-9]{8}$/.test(reg)) {
+      return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
+    }
+    if (!/^[0-9]+$/.test(room)) {
+      return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
     }
 
-    const user = await User.create({
+    const finalDepartment = normalizeDepartment(department);
+    const finalYear = normalizeYear(year);
+
+    const student = await Student.create({
+      name: name.trim(),
       username: normalizedUsername,
-      password,
-      role: role || 'student',
-      name,
+      registerNumber: reg || '',
       reg: reg || '',
-      room: room || '',
       studentId: studentId || normalizedUsername,
-      staffId: staffId || normalizedUsername,
-      designation: designation || (role === 'faculty' ? 'Faculty Advisor' : 'Hostel Warden / Admin'),
+      password,
+      role: 'student',
+      room: room ? String(room).trim() : '',
       department: finalDepartment,
       year: finalYear,
       status: 'active',
-      email: email || '',
-      phone: phone || '',
-      homeAddress: homeAddress || ''
+      email: (email || '').trim().toLowerCase(),
+      phone: (phone || '').trim(),
+      homeAddress: (homeAddress || '').trim()
     });
 
-    const token = generateToken(user._id);
+    const token = generateToken(student, 'student');
 
     return res.status(201).json({
       success: true,
       token,
       user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        reg: user.reg,
-        room: user.room,
-        studentId: user.studentId,
-        staffId: user.staffId,
-        designation: user.designation,
-        department: user.department,
-        year: user.year,
-        status: user.status,
-        email: user.email,
-        phone: user.phone,
-        homeAddress: user.homeAddress
+        id: student._id,
+        _id: student._id,
+        username: student.username,
+        role: 'student',
+        name: student.name,
+        reg: student.reg,
+        registerNumber: student.registerNumber,
+        room: student.room,
+        studentId: student.studentId,
+        department: student.department,
+        year: student.year,
+        assignedYear: student.year,
+        status: student.status,
+        email: student.email,
+        phone: student.phone,
+        homeAddress: student.homeAddress
       }
     });
   } catch (error) {
@@ -123,7 +118,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // @route   POST /api/auth/login
-// @desc    Authenticate user & get token
+// @desc    Authenticate user & get token based on role and dedicated collection
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
@@ -134,16 +129,101 @@ router.post('/login', async (req, res) => {
     }
 
     const normalizedUsername = username.trim().toLowerCase();
+    const reqRole = role.trim().toLowerCase();
 
-    if (role === 'student' && !/^8301[0-9]{8}$/.test(password)) {
-      return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
+    let user = null;
+    let sessionRole = 'student';
+
+    // 1. STUDENT LOGIN -> check students collection
+    if (reqRole === 'student') {
+      if (!/^8301[0-9]{8}$/.test(password)) {
+        return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
+      }
+
+      user = await Student.findOne({
+        $or: [
+          { username: normalizedUsername },
+          { studentId: new RegExp('^' + normalizedUsername + '$', 'i') },
+          { reg: normalizedUsername },
+          { registerNumber: normalizedUsername }
+        ]
+      });
+
+      if (!user) {
+        // Fallback to legacy User collection if not yet migrated
+        user = await User.findOne({ username: normalizedUsername, role: 'student' });
+      }
+
+      sessionRole = 'student';
+    }
+    // 2. FACULTY ADVISOR LOGIN -> check staff collection
+    else if (reqRole === 'faculty' || reqRole === 'faculty advisor') {
+      user = await Staff.findOne({
+        $or: [
+          { username: normalizedUsername },
+          { staffId: new RegExp('^' + normalizedUsername + '$', 'i') }
+        ]
+      });
+
+      if (!user) {
+        // Fallback to legacy User collection
+        user = await User.findOne({
+          username: normalizedUsername,
+          role: { $in: ['faculty', 'Faculty Advisor'] }
+        });
+      }
+
+      sessionRole = 'faculty';
+    }
+    // 3. WARDEN LOGIN -> check wardens collection
+    else if (reqRole === 'staff' || reqRole === 'warden') {
+      user = await Warden.findOne({
+        $or: [
+          { username: normalizedUsername },
+          { staffId: new RegExp('^' + normalizedUsername + '$', 'i') }
+        ]
+      });
+
+      if (!user) {
+        // Fallback to legacy User collection
+        user = await User.findOne({
+          username: normalizedUsername,
+          role: { $in: ['staff', 'warden', 'admin'] }
+        });
+      }
+
+      sessionRole = user && user.role === 'admin' ? 'admin' : 'staff';
+    }
+    // 4. ADMIN LOGIN -> check wardens collection (admin role) or legacy User
+    else if (reqRole === 'admin') {
+      user = await Warden.findOne({
+        $or: [
+          { username: normalizedUsername },
+          { staffId: new RegExp('^' + normalizedUsername + '$', 'i') }
+        ],
+        role: 'admin'
+      });
+
+      if (!user) {
+        user = await Warden.findOne({
+          $or: [
+            { username: normalizedUsername },
+            { staffId: new RegExp('^' + normalizedUsername + '$', 'i') }
+          ]
+        });
+      }
+
+      if (!user) {
+        user = await User.findOne({ username: normalizedUsername, role: 'admin' });
+      }
+
+      sessionRole = 'admin';
     }
 
-    const user = await User.findOne({ username: normalizedUsername, role });
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: role === 'student'
+        message: reqRole === 'student'
           ? 'No match. Check your Student ID, and remember the password is your Register No.'
           : 'No matching account. Check your details or contact Admin.'
       });
@@ -160,33 +240,38 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: role === 'student'
+        message: reqRole === 'student'
           ? 'No match. Check your Student ID, and remember the password is your Register No.'
           : 'Invalid credentials.'
       });
     }
 
-    const token = generateToken(user._id);
+    const assignedYear = user.assignedYear || user.year || '';
+    const token = generateToken(user, sessionRole);
 
     return res.json({
       success: true,
       token,
       user: {
         id: user._id,
+        _id: user._id,
         username: user.username,
-        role: user.role,
+        role: sessionRole,
+        originalRole: user.role,
         name: user.name,
-        reg: user.reg,
-        room: user.room,
-        studentId: user.studentId,
-        staffId: user.staffId,
-        designation: user.designation,
-        department: user.department,
-        year: user.year,
+        reg: user.reg || user.registerNumber || '',
+        registerNumber: user.registerNumber || user.reg || '',
+        room: user.room || '',
+        studentId: user.studentId || '',
+        staffId: user.staffId || '',
+        designation: user.designation || '',
+        department: user.department || '',
+        year: assignedYear,
+        assignedYear,
         status: user.status,
-        email: user.email,
-        phone: user.phone,
-        homeAddress: user.homeAddress
+        email: user.email || '',
+        phone: user.phone || '',
+        homeAddress: user.homeAddress || ''
       }
     });
   } catch (error) {
@@ -203,23 +288,31 @@ router.get('/me', protect, async (req, res) => {
     success: true,
     user: {
       id: req.user._id,
+      _id: req.user._id,
       username: req.user.username,
       role: req.user.role,
+      originalRole: req.user.originalRole,
       name: req.user.name,
-      reg: req.user.reg,
-      room: req.user.room,
-      studentId: req.user.studentId,
-      staffId: req.user.staffId,
-      designation: req.user.designation,
-      department: req.user.department,
-      year: req.user.year,
+      reg: req.user.reg || req.user.registerNumber || '',
+      registerNumber: req.user.registerNumber || req.user.reg || '',
+      room: req.user.room || '',
+      studentId: req.user.studentId || '',
+      staffId: req.user.staffId || '',
+      designation: req.user.designation || '',
+      department: req.user.department || '',
+      year: req.user.assignedYear || req.user.year || '',
+      assignedYear: req.user.assignedYear || req.user.year || '',
       status: req.user.status,
-      email: req.user.email,
-      phone: req.user.phone,
-      homeAddress: req.user.homeAddress
+      email: req.user.email || '',
+      phone: req.user.phone || '',
+      homeAddress: req.user.homeAddress || ''
     }
   });
 });
+
+// =====================================================================
+// WARDEN PASSWORD RESET ROUTES (wardens collection)
+// =====================================================================
 
 // @route   POST /api/auth/warden/forgot-password
 // @desc    Initiate password reset for Warden account via exact Warden ID + Email
@@ -240,14 +333,23 @@ router.post('/warden/forgot-password', async (req, res) => {
 
     const cleanWardenId = inputWardenId.toLowerCase();
 
-    // 1. Verify Warden ID exists in active Warden accounts
-    const wardenUser = await User.findOne({
+    // 1. Verify Warden ID exists in wardens collection
+    let wardenUser = await Warden.findOne({
       $or: [
         { username: cleanWardenId },
         { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
-      ],
-      role: { $in: ['staff', 'admin'] }
+      ]
     });
+
+    if (!wardenUser) {
+      wardenUser = await User.findOne({
+        $or: [
+          { username: cleanWardenId },
+          { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+        ],
+        role: { $in: ['staff', 'admin'] }
+      });
+    }
 
     if (!wardenUser) {
       return res.status(404).json({
@@ -296,7 +398,7 @@ router.post('/warden/forgot-password', async (req, res) => {
 
     // Save OTP to DB ONLY after real email dispatch succeeds
     wardenUser.resetOtp = otp;
-    wardenUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+    wardenUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000);
     await wardenUser.save();
 
     return res.json({
@@ -325,14 +427,24 @@ router.post('/warden/verify-otp', async (req, res) => {
 
     const cleanWardenId = inputWardenId.toLowerCase();
 
-    const wardenUser = await User.findOne({
+    let wardenUser = await Warden.findOne({
       $or: [
         { username: cleanWardenId },
         { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
       ],
-      email: cleanEmail,
-      role: { $in: ['staff', 'admin'] }
+      email: cleanEmail
     });
+
+    if (!wardenUser) {
+      wardenUser = await User.findOne({
+        $or: [
+          { username: cleanWardenId },
+          { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: { $in: ['staff', 'admin'] }
+      });
+    }
 
     if (!wardenUser) {
       return res.status(404).json({ success: false, message: 'Invalid Warden ID or Email.' });
@@ -376,14 +488,24 @@ router.post('/warden/reset-password', async (req, res) => {
 
     const cleanWardenId = inputWardenId.toLowerCase();
 
-    const wardenUser = await User.findOne({
+    let wardenUser = await Warden.findOne({
       $or: [
         { username: cleanWardenId },
         { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
       ],
-      email: cleanEmail,
-      role: { $in: ['staff', 'admin'] }
+      email: cleanEmail
     });
+
+    if (!wardenUser) {
+      wardenUser = await User.findOne({
+        $or: [
+          { username: cleanWardenId },
+          { staffId: new RegExp('^' + cleanWardenId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: { $in: ['staff', 'admin'] }
+      });
+    }
 
     if (!wardenUser) {
       return res.status(404).json({ success: false, message: 'Warden account not found.' });
@@ -397,7 +519,6 @@ router.post('/warden/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
     }
 
-    // Update password for ONLY this Warden account (pre-save hook hashes password using bcrypt)
     wardenUser.password = newPassword;
     wardenUser.resetOtp = '';
     wardenUser.resetOtpExpire = null;
@@ -415,7 +536,7 @@ router.post('/warden/reset-password', async (req, res) => {
 });
 
 // =====================================================================
-// FACULTY ADVISOR PASSWORD RESET ROUTES
+// FACULTY ADVISOR PASSWORD RESET ROUTES (staff collection)
 // =====================================================================
 
 // @route   POST /api/auth/faculty/forgot-password
@@ -437,14 +558,22 @@ router.post('/faculty/forgot-password', async (req, res) => {
 
     const cleanFacultyId = inputFacultyId.toLowerCase();
 
-    // 1. Verify Faculty Advisor ID exists in active Faculty accounts
-    const facultyUser = await User.findOne({
+    let facultyUser = await Staff.findOne({
       $or: [
         { username: cleanFacultyId },
         { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
-      ],
-      role: 'faculty'
+      ]
     });
+
+    if (!facultyUser) {
+      facultyUser = await User.findOne({
+        $or: [
+          { username: cleanFacultyId },
+          { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+        ],
+        role: { $in: ['faculty', 'Faculty Advisor'] }
+      });
+    }
 
     if (!facultyUser) {
       return res.status(404).json({
@@ -453,7 +582,6 @@ router.post('/faculty/forgot-password', async (req, res) => {
       });
     }
 
-    // 2. Verify registered Email matches this exact Faculty Advisor ID
     const registeredEmail = (facultyUser.email || '').trim().toLowerCase();
     if (!registeredEmail || registeredEmail !== inputEmail) {
       return res.status(400).json({
@@ -462,10 +590,8 @@ router.post('/faculty/forgot-password', async (req, res) => {
       });
     }
 
-    // 3. Generate secure 6-digit OTP (expires in 5 minutes)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 4. Send Email to the exact registered email address FIRST
     const mailResult = await sendEmail({
       to: facultyUser.email,
       subject: 'GCES Kaveri Hostel - Faculty Advisor Password Reset OTP',
@@ -491,9 +617,8 @@ router.post('/faculty/forgot-password', async (req, res) => {
       });
     }
 
-    // Save OTP to DB ONLY after real email dispatch succeeds
     facultyUser.resetOtp = otp;
-    facultyUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+    facultyUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000);
     await facultyUser.save();
 
     return res.json({
@@ -522,14 +647,24 @@ router.post('/faculty/verify-otp', async (req, res) => {
 
     const cleanFacultyId = inputFacultyId.toLowerCase();
 
-    const facultyUser = await User.findOne({
+    let facultyUser = await Staff.findOne({
       $or: [
         { username: cleanFacultyId },
         { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
       ],
-      email: cleanEmail,
-      role: 'faculty'
+      email: cleanEmail
     });
+
+    if (!facultyUser) {
+      facultyUser = await User.findOne({
+        $or: [
+          { username: cleanFacultyId },
+          { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: { $in: ['faculty', 'Faculty Advisor'] }
+      });
+    }
 
     if (!facultyUser) {
       return res.status(404).json({ success: false, message: 'Invalid Faculty Advisor ID or Email.' });
@@ -556,7 +691,7 @@ router.post('/faculty/verify-otp', async (req, res) => {
 // @route   POST /api/auth/faculty/reset-password
 // @desc    Set new password after OTP verification for specific Faculty Advisor ID
 // @access  Public
-router.post('/api/auth/faculty/reset-password', async (req, res) => {
+const facultyResetPasswordHandler = async (req, res) => {
   try {
     const { staffId, facultyId, username, email, otp, newPassword } = req.body;
     const inputFacultyId = (staffId || facultyId || username || '').trim();
@@ -573,70 +708,24 @@ router.post('/api/auth/faculty/reset-password', async (req, res) => {
 
     const cleanFacultyId = inputFacultyId.toLowerCase();
 
-    const facultyUser = await User.findOne({
+    let facultyUser = await Staff.findOne({
       $or: [
         { username: cleanFacultyId },
         { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
       ],
-      email: cleanEmail,
-      role: 'faculty'
+      email: cleanEmail
     });
 
     if (!facultyUser) {
-      return res.status(404).json({ success: false, message: 'Faculty Advisor account not found.' });
+      facultyUser = await User.findOne({
+        $or: [
+          { username: cleanFacultyId },
+          { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: { $in: ['faculty', 'Faculty Advisor'] }
+      });
     }
-
-    if (!facultyUser.resetOtp || facultyUser.resetOtp !== cleanOtp) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP code. Password reset aborted.' });
-    }
-
-    if (!facultyUser.resetOtpExpire || facultyUser.resetOtpExpire < Date.now()) {
-      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
-    }
-
-    // Update password for ONLY this Faculty Advisor account (pre-save hook hashes password using bcrypt)
-    facultyUser.password = newPassword;
-    facultyUser.resetOtp = '';
-    facultyUser.resetOtpExpire = null;
-
-    await facultyUser.save();
-
-    return res.json({
-      success: true,
-      message: 'Password reset successfully.'
-    });
-  } catch (error) {
-    console.error('Faculty reset-password error:', error);
-    return res.status(500).json({ success: false, message: 'Server error updating password.' });
-  }
-});
-
-// Also register route without prefix for safety
-router.post('/faculty/reset-password', async (req, res) => {
-  try {
-    const { staffId, facultyId, username, email, otp, newPassword } = req.body;
-    const inputFacultyId = (staffId || facultyId || username || '').trim();
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanOtp = (otp || '').trim();
-
-    if (!inputFacultyId || !cleanEmail || !cleanOtp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Faculty Advisor ID, Email, OTP, and new password are required.' });
-    }
-
-    if (newPassword.length < 4) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
-    }
-
-    const cleanFacultyId = inputFacultyId.toLowerCase();
-
-    const facultyUser = await User.findOne({
-      $or: [
-        { username: cleanFacultyId },
-        { staffId: new RegExp('^' + cleanFacultyId + '$', 'i') }
-      ],
-      email: cleanEmail,
-      role: 'faculty'
-    });
 
     if (!facultyUser) {
       return res.status(404).json({ success: false, message: 'Faculty Advisor account not found.' });
@@ -664,10 +753,13 @@ router.post('/faculty/reset-password', async (req, res) => {
     console.error('Faculty reset-password error:', error);
     return res.status(500).json({ success: false, message: 'Server error updating password.' });
   }
-});
+};
+
+router.post('/faculty/reset-password', facultyResetPasswordHandler);
+router.post('/api/auth/faculty/reset-password', facultyResetPasswordHandler);
 
 // =====================================================================
-// STUDENT PASSWORD RESET ROUTES
+// STUDENT PASSWORD RESET ROUTES (students collection)
 // =====================================================================
 
 // @route   POST /api/auth/student/forgot-password
@@ -688,14 +780,24 @@ router.post('/student/forgot-password', async (req, res) => {
 
     const cleanStudentId = inputStudentId.toLowerCase();
 
-    // 1. Find student by username or studentId field
-    const studentUser = await User.findOne({
+    let studentUser = await Student.findOne({
       $or: [
         { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
-      ],
-      role: 'student'
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { reg: cleanStudentId },
+        { registerNumber: cleanStudentId }
+      ]
     });
+
+    if (!studentUser) {
+      studentUser = await User.findOne({
+        $or: [
+          { username: cleanStudentId },
+          { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+        ],
+        role: 'student'
+      });
+    }
 
     if (!studentUser) {
       return res.status(404).json({
@@ -704,7 +806,6 @@ router.post('/student/forgot-password', async (req, res) => {
       });
     }
 
-    // 2. Verify email matches registered email
     const registeredEmail = (studentUser.email || '').trim().toLowerCase();
     if (!registeredEmail || registeredEmail !== inputEmail) {
       return res.status(400).json({
@@ -713,10 +814,8 @@ router.post('/student/forgot-password', async (req, res) => {
       });
     }
 
-    // 3. Generate secure 6-digit OTP (expires in 5 minutes)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 4. Send email FIRST, only save OTP if dispatch succeeds
     const mailResult = await sendEmail({
       to: studentUser.email,
       subject: 'GCES Kaveri Hostel - Student Password Reset OTP',
@@ -742,9 +841,8 @@ router.post('/student/forgot-password', async (req, res) => {
       });
     }
 
-    // Save OTP to DB ONLY after successful email dispatch
     studentUser.resetOtp = otp;
-    studentUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+    studentUser.resetOtpExpire = new Date(Date.now() + 5 * 60 * 1000);
     await studentUser.save();
 
     return res.json({
@@ -773,14 +871,26 @@ router.post('/student/verify-otp', async (req, res) => {
 
     const cleanStudentId = inputStudentId.toLowerCase();
 
-    const studentUser = await User.findOne({
+    let studentUser = await Student.findOne({
       $or: [
         { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { reg: cleanStudentId },
+        { registerNumber: cleanStudentId }
       ],
-      email: cleanEmail,
-      role: 'student'
+      email: cleanEmail
     });
+
+    if (!studentUser) {
+      studentUser = await User.findOne({
+        $or: [
+          { username: cleanStudentId },
+          { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: 'student'
+      });
+    }
 
     if (!studentUser) {
       return res.status(404).json({ success: false, message: 'Invalid Student ID or Email.' });
@@ -824,14 +934,26 @@ router.post('/student/reset-password', async (req, res) => {
 
     const cleanStudentId = inputStudentId.toLowerCase();
 
-    const studentUser = await User.findOne({
+    let studentUser = await Student.findOne({
       $or: [
         { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { reg: cleanStudentId },
+        { registerNumber: cleanStudentId }
       ],
-      email: cleanEmail,
-      role: 'student'
+      email: cleanEmail
     });
+
+    if (!studentUser) {
+      studentUser = await User.findOne({
+        $or: [
+          { username: cleanStudentId },
+          { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
+        ],
+        email: cleanEmail,
+        role: 'student'
+      });
+    }
 
     if (!studentUser) {
       return res.status(404).json({ success: false, message: 'Student account not found.' });
@@ -845,7 +967,6 @@ router.post('/student/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, message: 'OTP expired. Please request a new password reset.' });
     }
 
-    // Update password (pre-save hook hashes it via bcrypt)
     studentUser.password = newPassword;
     studentUser.resetOtp = '';
     studentUser.resetOtpExpire = null;
@@ -863,5 +984,3 @@ router.post('/student/reset-password', async (req, res) => {
 });
 
 module.exports = router;
-
-

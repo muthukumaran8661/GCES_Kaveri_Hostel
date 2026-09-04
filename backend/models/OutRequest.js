@@ -98,17 +98,17 @@ const OutRequestSchema = new mongoose.Schema({
   },
   assignedFacultyAdvisorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Staff',
     default: null
   },
   assignedFacultyId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Staff',
     default: null
   },
   assignedWardenId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Warden',
     default: null
   },
   callAttempts: {

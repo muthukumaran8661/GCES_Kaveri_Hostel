@@ -6,14 +6,16 @@ const fs = require('fs');
 const connectDB = require('./config/db');
 const { seedWardenAccounts } = require('./config/seedWardens');
 const { seedFacultyAccounts } = require('./config/seedFaculty');
+const { runMigration } = require('./scripts/migrate_to_collections');
 const { getFromAddress } = require('./utils/mailer');
 
 // Load env vars from backend/.env or parent env
 dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 
-// Connect to Database & Seed Fixed Warden + Faculty Accounts
-connectDB().then(() => {
+// Connect to Database, Run Migration, & Seed Fixed Accounts
+connectDB().then(async () => {
+  await runMigration();
   seedWardenAccounts();
   seedFacultyAccounts();
 }).catch(() => {
@@ -33,6 +35,9 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/requests', require('./routes/requestRoutes'));
 app.use('/api/qr', require('./routes/qrRoutes'));
+app.use('/api/students', require('./routes/studentRoutes'));
+app.use('/api/staff', require('./routes/staffRoutes'));
+app.use('/api/wardens', require('./routes/wardenRoutes'));
 
 // Serve Frontend Static Files in Production / Deployment
 const frontendDist = path.join(__dirname, '../frontend/dist');
