@@ -56,28 +56,61 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   // Filter requests based on status, dynamic assignment, and user role
   const scopedRequests = requests.filter(r => {
     if (session?.role === 'admin') return true;
+    const sessionUserId = (session?._id || session?.id)?.toString();
+
     if (isFaculty) {
+      const isAssignedDirectly = (r.assignedFacultyAdvisorId && r.assignedFacultyAdvisorId.toString() === sessionUserId) ||
+                                 (r.assignedFacultyId && r.assignedFacultyId.toString() === sessionUserId);
+      if (isAssignedDirectly) return true;
       return matchesDepartment(session?.department, r.department) &&
              matchesYear(session?.year, r.year);
     }
+
     if (isAdminOrWarden) {
-      if (!matchesYear(session?.year, r.year)) return false;
+      const isAssignedDirectly = (r.assignedWardenId && r.assignedWardenId.toString() === sessionUserId);
+      if (isAssignedDirectly) {
+        // Wardens must not see weekday requests before Faculty Advisor approval
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
+      }
+
       const wardenDept = normalizeDepartment(session?.department);
-      if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
-        return false;
+      const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
+      const yearMatches = matchesYear(session?.year, r.year);
+      const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, r.department);
+
+      // Year Wardens manage their assigned Year across all departments
+      if (yearMatches || (deptMatches && yearMatches)) {
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
       }
-      // Wardens must not see weekday requests before Faculty Advisor approval
-      if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
-        return false;
-      }
-      return true;
+
+      return false;
     }
     return true;
   });
 
-  const pendingFaculty = scopedRequests.filter(r => r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY');
-  const pendingStaff = scopedRequests.filter(r => r.status === 'pending_staff' || r.currentApprovalStage === 'WARDEN');
-  const notifying = scopedRequests.filter(r => r.status === 'notifying_parent' || r.currentApprovalStage === 'PARENT');
+  const pendingFaculty = scopedRequests.filter(r =>
+    r.status === 'pending_faculty' ||
+    r.currentApprovalStage === 'FACULTY'
+  );
+
+  const pendingStaff = scopedRequests.filter(r =>
+    r.status === 'pending_staff' ||
+    r.status === 'pending_warden' ||
+    r.status === 'faculty_approved' ||
+    r.currentApprovalStage === 'WARDEN'
+  );
+
+  const notifying = scopedRequests.filter(r =>
+    r.status === 'notifying_parent' ||
+    r.currentApprovalStage === 'PARENT'
+  );
+
   const outNow = scopedRequests.filter(r => r.qrStatus === 'OUT');
   const returnedToday = scopedRequests.filter(r => r.status === 'returned');
 

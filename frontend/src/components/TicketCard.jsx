@@ -58,9 +58,9 @@ export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
     : r.type === 'weekday'
       ? 'Weekday / Emergency Out Pass (Faculty & Warden Approval)'
       : 'Weekend Out Pass (Warden Approval)';
-  const showFacultyApprove = viewer === 'staff' && r.status === 'pending_faculty';
-  const showStaffApprove = viewer === 'staff' && r.status === 'pending_staff';
-  const showParentRecord = viewer === 'staff' && r.status === 'notifying_parent';
+  const showFacultyApprove = viewer === 'staff' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY');
+  const showStaffApprove = viewer === 'staff' && (r.status === 'pending_staff' || r.status === 'pending_warden' || r.status === 'faculty_approved' || r.currentApprovalStage === 'WARDEN');
+  const showParentRecord = viewer === 'staff' && (r.status === 'notifying_parent' || r.currentApprovalStage === 'PARENT');
   const justStamped = r.status === 'approved_final' || r.status === 'returned';
   const isAccepted = r.status === 'approved_final';
   const isDeclined = REJECTED_STATUSES.includes(r.status);

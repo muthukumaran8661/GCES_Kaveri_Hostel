@@ -354,35 +354,89 @@ router.get('/warden', protect, protectWarden, async (req, res) => {
     const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
 
     const wardenDept = normalizeDepartment(req.user.department);
+    const wardenIdStr = (req.user._id || req.user.id)?.toString();
+
     const filtered = enrichedRequests.filter(r => {
       if (req.user.role === 'admin') return true;
 
-      const isAssignedDirectly = (r.assignedWardenId && r.assignedWardenId.toString() === req.user._id.toString());
+      const isAssignedDirectly = r.assignedWardenId && r.assignedWardenId.toString() === wardenIdStr;
+      if (isAssignedDirectly) {
+        // Direct assignment check: don't show weekday requests before faculty approval
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
+      }
+
+      // Year Wardens handle their assigned Year across all departments
       const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
-      const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, r.department);
       const yearMatches = matchesYear(req.user.year || req.user.assignedYear, r.year);
+      const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, r.department);
 
-      if (!isAssignedDirectly && (!deptMatches || !yearMatches)) {
-        return false;
+      if (yearMatches || (deptMatches && yearMatches)) {
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
       }
 
-      // Suppress weekday requests before Faculty Advisor approval
-      if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
-        return false;
-      }
-
-      // Optional stage filter if query parameter is passed (e.g. ?stage=WARDEN)
-      if (req.query.stage && r.currentApprovalStage !== req.query.stage) {
-        return false;
-      }
-
-      return true;
+      return false;
     });
 
     return res.json({ success: true, requests: filtered });
   } catch (error) {
     console.error('Get warden requests error:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching warden requests.' });
+  }
+});
+
+// @route   GET /api/requests/warden/pending
+// @desc    Get pending action queue requests waiting for the logged-in Warden's approval
+// @access  Private (Warden/Admin)
+router.get('/warden/pending', protect, protectWarden, async (req, res) => {
+  try {
+    const allRequests = await OutRequest.find({
+      $or: [
+        { status: 'pending_staff' },
+        { currentApprovalStage: 'WARDEN' },
+        { status: 'notifying_parent' },
+        { currentApprovalStage: 'PARENT' }
+      ]
+    }).sort({ createdAt: -1 }).lean();
+
+    const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
+    const wardenDept = normalizeDepartment(req.user.department);
+    const wardenIdStr = (req.user._id || req.user.id)?.toString();
+
+    const pendingRequests = enrichedRequests.filter(r => {
+      if (req.user.role === 'admin') return true;
+
+      const isAssignedDirectly = r.assignedWardenId && r.assignedWardenId.toString() === wardenIdStr;
+      if (isAssignedDirectly) {
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
+      }
+
+      const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
+      const yearMatches = matchesYear(req.user.year || req.user.assignedYear, r.year);
+      const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, r.department);
+
+      if (yearMatches || (deptMatches && yearMatches)) {
+        if (r.type === 'weekday' && (r.status === 'pending_faculty' || r.currentApprovalStage === 'FACULTY')) {
+          return false;
+        }
+        return true;
+      }
+
+      return false;
+    });
+
+    return res.json({ success: true, requests: pendingRequests });
+  } catch (error) {
+    console.error('Get warden pending requests error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching warden pending requests.' });
   }
 });
 
@@ -502,19 +556,21 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
       }
 
       if (req.user.role === 'staff') {
-        if (!matchesYear(req.user.year, request.year)) {
-          return res.status(403).json({
-            success: false,
-            message: `403 Forbidden: You are not authorized to approve requests for ${request.year || 'this Year'}. Your assignment is ${req.user.year || 'N/A'}.`
-          });
-        }
+        const wardenIdStr = (req.user._id || req.user.id)?.toString();
+        const isAssignedDirectly = request.assignedWardenId && request.assignedWardenId.toString() === wardenIdStr;
 
-        const wardenDept = normalizeDepartment(req.user.department);
-        if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, request.department)) {
-          return res.status(403).json({
-            success: false,
-            message: `403 Forbidden: You are not authorized for department ${request.department}.`
-          });
+        if (!isAssignedDirectly) {
+          const wardenDept = normalizeDepartment(req.user.department);
+          const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
+          const yearMatches = matchesYear(req.user.year || req.user.assignedYear, request.year);
+          const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, request.department);
+
+          if (!yearMatches && (!deptMatches || !yearMatches)) {
+            return res.status(403).json({
+              success: false,
+              message: `403 Forbidden: You are not authorized to approve requests for ${request.year || 'this Year'}. Your assignment is ${req.user.year || 'N/A'}.`
+            });
+          }
         }
 
         if (request.type === 'weekday' && (request.status === 'pending_faculty' || request.currentApprovalStage === 'FACULTY')) {
