@@ -308,7 +308,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                   <div className="gkof-field">
                     <label>{role === 'faculty' ? 'Faculty ID' : 'Warden ID'}</label>
                     <input
-                      placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. Muthu@123'}
+                      placeholder={role === 'faculty' ? 'e.g. FAC-CSE-01' : 'e.g. WRD-01'}
                       value={staffId}
                       onChange={(e) => setStaffId(e.target.value)}
                     />
@@ -515,7 +515,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                         <div className="gkof-field">
                           <label>Warden ID</label>
                           <input
-                            placeholder="e.g. Muthu@123"
+                            placeholder="e.g. WRD-01"
                             value={staffId}
                             onChange={(e) => setStaffId(e.target.value)}
                           />

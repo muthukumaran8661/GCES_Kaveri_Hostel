@@ -5,7 +5,7 @@ const Staff = require('../models/Staff');
 const Warden = require('../models/Warden');
 const User = require('../models/User'); // fallback for migration safety
 
-const WARDEN_ALLOWLIST_USERNAMES = ['muthu@123'];
+const WARDEN_ALLOWLIST_USERNAMES = [];
 const FACULTY_ALLOWLIST_USERNAMES = [];
 
 const protect = async (req, res, next) => {

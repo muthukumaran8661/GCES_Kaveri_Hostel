@@ -132,7 +132,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
-const WARDEN_USERNAMES = ['muthu@123'];
+const WARDEN_USERNAMES = [];
 
 const DEPT_ORDER = {
   'cse': 1,
@@ -149,12 +149,13 @@ const DEPT_ORDER = {
 };
 
 function getWardenRank(u) {
+  const yearRank = getYearRank(u.year || u.assignedYear);
+  if (yearRank !== 99) return yearRank;
   const uname = (u.username || u.staffId || '').toLowerCase();
   const name = (u.name || '').toLowerCase();
-  if (uname.includes('muthu') || name.includes('muthukumaran')) return 1;
-  if (uname.includes('rajesh') || name.includes('rajesh')) return 2;
-  if (uname.includes('deva') || name.includes('deva')) return 3;
-  if (uname.includes('prince') || name.includes('prince')) return 4;
+  if (uname.includes('rajesh') || name.includes('rajesh')) return 1;
+  if (uname.includes('deva') || name.includes('deva')) return 2;
+  if (uname.includes('prince') || name.includes('prince')) return 3;
   return 99;
 }
 
@@ -180,7 +181,7 @@ function sortStaffUsers(users) {
     if (isWardenA && !isWardenB) return -1;
     if (!isWardenA && isWardenB) return 1;
 
-    // If both are Wardens, sort in fixed order: Muthukumaran G -> Rajesh P -> Deva N -> Prince P
+    // If both are Wardens, sort by Year or rank
     if (isWardenA && isWardenB) {
       return getWardenRank(a) - getWardenRank(b);
     }

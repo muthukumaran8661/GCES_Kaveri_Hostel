@@ -146,7 +146,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [deletingUser, setDeletingUser] = useState(null);
   const [deletingStaff, setDeletingStaff] = useState(false);
 
-  const WARDEN_ORDER_LIST = ['muthu@123'];
+  const WARDEN_ORDER_LIST = [];
   const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry', 'Maths', 'Physics', 'English'];
   const DEPT_ORDER_MAP = {
     'cse': 1,
@@ -163,12 +163,13 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   };
 
   function getWardenRank(u) {
+    const yearRank = getYearRank(u.year || u.assignedYear);
+    if (yearRank !== 99) return yearRank;
     const uname = (u.username || u.staffId || '').toLowerCase();
     const name = (u.name || '').toLowerCase();
-    if (uname.includes('muthu') || name.includes('muthukumaran')) return 1;
-    if (uname.includes('rajesh') || name.includes('rajesh')) return 2;
-    if (uname.includes('deva') || name.includes('deva')) return 3;
-    if (uname.includes('prince') || name.includes('prince')) return 4;
+    if (uname.includes('rajesh') || name.includes('rajesh')) return 1;
+    if (uname.includes('deva') || name.includes('deva')) return 2;
+    if (uname.includes('prince') || name.includes('prince')) return 3;
     return 99;
   }
 
