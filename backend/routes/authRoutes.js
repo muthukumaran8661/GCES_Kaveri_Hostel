@@ -106,7 +106,7 @@ router.post('/signup', async (req, res) => {
       username: normalizedUsername,
       registerNumber: regNo,
       reg: regNo,
-      studentId: studentId || normalizedUsername,
+      studentId: studentId || '',
       password: initialPassword,
       hasChangedPassword: hasChanged,
       role: 'student',

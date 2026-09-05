@@ -66,7 +66,6 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
   const [studentLoginPassword, setStudentLoginPassword] = useState('');
 
   // Student signup form state
-  const [studentId, setStudentId] = useState('');
   const [regNo, setRegNo] = useState('');
   const [roomNo, setRoomNo] = useState('');
   const [name, setName] = useState('');
@@ -125,7 +124,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
     e.preventDefault();
     setError('');
     if (role === 'student') {
-      if (!name.trim() || !regNo.trim() || !roomNo.trim() || !studentId.trim()) {
+      if (!name.trim() || !regNo.trim() || !roomNo.trim()) {
         setError('Please fill in every required field.');
         return;
       }
@@ -159,12 +158,12 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       }
       onSignup({
         role: 'student',
-        username: studentId.trim(),
+        username: regNo.trim(),
         password: regNo.trim(),
         name: name.trim(),
         reg: regNo.trim(),
+        registerNumber: regNo.trim(),
         room: roomNo.trim(),
-        studentId: studentId.trim(),
         department: department.trim(),
         year: year.trim(),
         email: cleanStudentEmail,
@@ -430,14 +429,6 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
                       placeholder="e.g. 123 Main Street, Thanjavur"
                       value={homeAddress}
                       onChange={(e) => setHomeAddress(e.target.value)}
-                    />
-                  </div>
-                  <div className="gkof-field">
-                    <label>Student ID</label>
-                    <input
-                      placeholder="e.g. 24cs526"
-                      value={studentId}
-                      onChange={(e) => setStudentId(e.target.value)}
                     />
                   </div>
                   <div className="gkof-field">

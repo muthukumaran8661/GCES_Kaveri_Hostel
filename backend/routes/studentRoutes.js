@@ -331,7 +331,7 @@ router.post('/', protect, protectWardenAllowlist, async (req, res) => {
       username: normUsername,
       registerNumber: finalReg,
       reg: finalReg,
-      studentId: normUsername,
+      studentId: req.body.studentId || '',
       password: initialPassword,
       hasChangedPassword: hasChanged,
       room: (room || '').trim(),
