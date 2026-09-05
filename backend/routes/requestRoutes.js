@@ -6,9 +6,8 @@ const OutRequest = require('../models/OutRequest');
 const Student = require('../models/Student');
 const Staff = require('../models/Staff');
 const Warden = require('../models/Warden');
-const User = require('../models/User'); // fallback
 const { protect, protectWarden, protectFaculty, protectStaffOrFaculty } = require('../middleware/authMiddleware');
-const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } = require('../utils/normalization');
+const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear, findMatchingFacultyAdvisors, findMatchingWardens } = require('../utils/normalization');
 
 function uid() {
   return 'REQ' + Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -163,33 +162,29 @@ router.post('/', protect, async (req, res) => {
     const studentDept = normalizeDepartment(req.user.department || department);
     const studentYear = normalizeYear(req.user.year || year);
 
-    // Query active Faculty from Staff collection
+    // Query active Faculty from Staff collection (fallback User collection)
     let activeStaffUsers = await Staff.find({ status: 'active' }).lean();
     if (!activeStaffUsers || activeStaffUsers.length === 0) {
       activeStaffUsers = await User.find({ role: 'faculty', status: 'active' }).lean();
     }
 
-    // Query active Wardens from Warden collection
+    // Query active Wardens from Warden collection (fallback User collection)
     let activeWardens = await Warden.find({ status: 'active' }).lean();
     if (!activeWardens || activeWardens.length === 0) {
       activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
     }
 
     // Match Faculty Advisors for this student's Department and Year
-    const matchedFaculties = activeStaffUsers.filter(u =>
-      matchesDepartment(u.department, studentDept) &&
-      matchesYear(u.assignedYear || u.year, studentYear)
-    );
+    const matchedFaculties = findMatchingFacultyAdvisors(activeStaffUsers, studentDept, studentYear);
 
-    // Match Wardens for this student's Year and Department (or general hostel administration)
-    const matchedWardens = activeWardens.filter(u =>
-      (matchesDepartment(u.department, studentDept) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
-      matchesYear(u.assignedYear || u.year, studentYear)
-    );
+    // Match Wardens for this student's Department and Year with prioritized fallback
+    const matchedWardens = findMatchingWardens(activeWardens, studentDept, studentYear);
 
-    console.log(`[ROUTING] Student Dept: ${studentDept}, Year: ${studentYear}`);
-    console.log(`[ROUTING] Matched Faculty: [${matchedFaculties.map(f => f.staffId || f.username || f._id).join(', ')}]`);
-    console.log(`[ROUTING] Matched Warden: [${matchedWardens.map(w => w.staffId || w.username || w._id).join(', ')}]`);
+    console.log(`[ROUTING DEBUG] Student department: "${studentDept}", Student year: "${studentYear}", Request Type: "${type}"`);
+    console.log(`[ROUTING DEBUG] Faculty Advisor search criteria: Dept="${studentDept}", Year="${studentYear}"`);
+    console.log(`[ROUTING DEBUG] Faculty Advisor result: count=${matchedFaculties.length}, matches=[${matchedFaculties.map(f => `${f.name || f.username} (${f.department} - ${f.assignedYear || f.year})`).join(', ')}]`);
+    console.log(`[ROUTING DEBUG] Warden search criteria: Dept="${studentDept}", Year="${studentYear}"`);
+    console.log(`[ROUTING DEBUG] Warden result: count=${matchedWardens.length}, matches=[${matchedWardens.map(w => `${w.name || w.username} (${w.department} - ${w.assignedYear || w.year})`).join(', ')}]`);
 
     // Strict validation
     if (type === 'weekday') {
@@ -362,13 +357,12 @@ router.get('/warden', protect, protectWarden, async (req, res) => {
     const filtered = enrichedRequests.filter(r => {
       if (req.user.role === 'admin') return true;
 
-      // Filter: student.department matches loggedInWarden.department (or general hostel administration)
-      if (wardenDept && wardenDept !== 'HOSTEL ADMINISTRATION' && !matchesDepartment(wardenDept, r.department)) {
-        return false;
-      }
+      const isAssignedDirectly = (r.assignedWardenId && r.assignedWardenId.toString() === req.user._id.toString());
+      const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
+      const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, r.department);
+      const yearMatches = matchesYear(req.user.year || req.user.assignedYear, r.year);
 
-      // Filter: student.year matches loggedInWarden.assignedYear
-      if (!matchesYear(req.user.year, r.year)) {
+      if (!isAssignedDirectly && (!deptMatches || !yearMatches)) {
         return false;
       }
 
@@ -401,13 +395,12 @@ router.get('/faculty', protect, protectFaculty, async (req, res) => {
     const enrichedRequests = await enrichRequestsWithStudentInfo(allRequests);
 
     const filtered = enrichedRequests.filter(r => {
-      // Filter: student.department matches loggedInFaculty.department
-      if (!matchesDepartment(req.user.department, r.department)) {
-        return false;
-      }
+      const isAssignedDirectly = (r.assignedFacultyAdvisorId && r.assignedFacultyAdvisorId.toString() === req.user._id.toString()) ||
+                                 (r.assignedFacultyId && r.assignedFacultyId.toString() === req.user._id.toString());
+      const deptMatches = matchesDepartment(req.user.department, r.department);
+      const yearMatches = matchesYear(req.user.year || req.user.assignedYear, r.year);
 
-      // Filter: student.year matches loggedInFaculty.assignedYear
-      if (!matchesYear(req.user.year, r.year)) {
+      if (!isAssignedDirectly && (!deptMatches || !yearMatches)) {
         return false;
       }
 
@@ -546,10 +539,7 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
           if (!activeWardens || activeWardens.length === 0) {
             activeWardens = await User.find({ role: 'staff', status: 'active' }).lean();
           }
-          const matchedWardens = activeWardens.filter(u =>
-            (matchesDepartment(u.department, request.department) || normalizeDepartment(u.department) === 'HOSTEL ADMINISTRATION' || !u.department) &&
-            matchesYear(u.assignedYear || u.year, request.year)
-          );
+          const matchedWardens = findMatchingWardens(activeWardens, request.department, request.year);
           if (matchedWardens.length > 0) {
             request.assignedWardenId = matchedWardens[0]._id;
           }
