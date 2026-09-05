@@ -219,6 +219,9 @@ export default function App() {
     setRequests([]);
     setCurrentTab('dashboard');
     setAuthError('');
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   };
 
   const handleSaveProfileAddress = async (homeAddress, department, year) => {

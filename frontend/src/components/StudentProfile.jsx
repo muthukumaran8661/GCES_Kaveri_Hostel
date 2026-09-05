@@ -38,6 +38,7 @@ export default function StudentProfile({
   const [address, setAddress] = useState(session.homeAddress || '');
   const [savedMsg, setSavedMsg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Department Edit state
   const [isEditingDept, setIsEditingDept] = useState(false);
@@ -506,8 +507,77 @@ export default function StudentProfile({
       </div>
 
       <div className="gkof-card">
-        <button className="gkof-btn red wide" onClick={onLogout}>Log Out</button>
+        <button
+          type="button"
+          className="gkof-btn red wide"
+          onClick={() => setShowLogoutModal(true)}
+        >
+          Log Out
+        </button>
       </div>
+
+      {showLogoutModal && (
+        <div
+          className="gkof-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLogoutModal(false);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="student-logout-confirm-title"
+        >
+          <div className="gkof-modal-box" style={{ maxWidth: '400px', textAlign: 'center' }}>
+            <button
+              type="button"
+              className="gkof-modal-close"
+              onClick={() => setShowLogoutModal(false)}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🚪</div>
+
+            <h3
+              id="student-logout-confirm-title"
+              style={{
+                fontFamily: "'Roboto Slab', serif",
+                fontSize: '18px',
+                color: 'var(--ink)',
+                margin: '0 0 10px'
+              }}
+            >
+              Are you sure you want to logout?
+            </h3>
+
+            <p style={{ fontSize: '13px', color: 'var(--ink-soft)', margin: '0 0 20px', lineHeight: 1.4 }}>
+              You will need your Register Number and password to log in again.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="gkof-btn red"
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  onLogout();
+                }}
+              >
+                Yes, Log Out
+              </button>
+              <button
+                type="button"
+                className="gkof-btn ghost"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showSettings && (
         <SettingsModal
