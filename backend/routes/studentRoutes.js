@@ -193,6 +193,78 @@ router.get('/', protect, protectWardenAllowlist, async (req, res) => {
   }
 });
 
+// @route   POST /api/students/change-password
+// @desc    Change student password from default Register Number to a custom password
+// @access  Private (Student)
+router.post('/change-password', protect, async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current password and new password are required.' });
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'New password and confirmation do not match.' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    }
+
+    const studentId = req.user._id || req.user.id;
+    let student = await Student.findById(studentId);
+    if (!student) {
+      student = await Student.findOne({ username: req.user.username });
+    }
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student account not found.' });
+    }
+
+    // Verify current password
+    let isMatch = await student.matchPassword(currentPassword);
+    if (!isMatch && !student.hasChangedPassword) {
+      const defaultReg = student.registerNumber || student.reg || student.username;
+      if (defaultReg && currentPassword === defaultReg) {
+        isMatch = true;
+      }
+    }
+
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect.' });
+    }
+
+    // Update to new password and set hasChangedPassword = true
+    student.password = newPassword;
+    student.hasChangedPassword = true;
+    await student.save();
+
+    // Also sync with legacy User collection if record exists
+    try {
+      const User = require('../models/User');
+      const legacyUser = await User.findOne({
+        $or: [{ _id: student._id }, { username: student.username }]
+      });
+      if (legacyUser) {
+        legacyUser.password = newPassword;
+        legacyUser.hasChangedPassword = true;
+        await legacyUser.save();
+      }
+    } catch (e) {
+      // ignore legacy error
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password changed successfully! Please use your new password for future logins.'
+    });
+  } catch (error) {
+    console.error('Change student password error:', error);
+    return res.status(500).json({ success: false, message: 'Server error changing password.' });
+  }
+});
+
 // @route   POST /api/students
 // @desc    Admin add student account
 // @access  Private (Warden/Admin)
@@ -200,23 +272,29 @@ router.post('/', protect, protectWardenAllowlist, async (req, res) => {
   try {
     const { name, username, reg, registerNumber, room, department, year, email, phone, password, homeAddress } = req.body;
 
-    if (!name || !username || !password) {
-      return res.status(400).json({ success: false, message: 'Name, Login ID, and Password are required.' });
+    const finalReg = (registerNumber || reg || username || '').trim();
+
+    if (!name || !finalReg) {
+      return res.status(400).json({ success: false, message: 'Name and Register Number are required.' });
     }
 
-    const normUsername = username.trim().toLowerCase();
-    const finalReg = (reg || registerNumber || '').trim();
+    if (!/^8301[0-9]{8}$/.test(finalReg)) {
+      return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
+    }
+
+    const normUsername = (username || finalReg).trim().toLowerCase();
 
     const exists = await Student.findOne({
       $or: [
+        { registerNumber: finalReg },
+        { reg: finalReg },
         { username: normUsername },
-        { studentId: new RegExp('^' + normUsername + '$', 'i') },
-        ...(finalReg ? [{ reg: finalReg }, { registerNumber: finalReg }] : [])
+        { studentId: new RegExp('^' + normUsername + '$', 'i') }
       ]
     });
 
     if (exists) {
-      return res.status(400).json({ success: false, message: 'Student with this Login ID or Register No already exists.' });
+      return res.status(400).json({ success: false, message: 'Student with this Register No or Login ID already exists.' });
     }
 
     // Email validation
@@ -244,13 +322,18 @@ router.post('/', protect, protectWardenAllowlist, async (req, res) => {
       return res.status(400).json({ success: false, message: 'This email ID is already registered.' });
     }
 
+    // Default password = Student's Register Number
+    const initialPassword = (password && password.trim()) ? password.trim() : finalReg;
+    const hasChanged = Boolean(password && password.trim() !== finalReg);
+
     const newStudent = await Student.create({
       name: name.trim(),
       username: normUsername,
       registerNumber: finalReg,
       reg: finalReg,
       studentId: normUsername,
-      password: password.trim(),
+      password: initialPassword,
+      hasChangedPassword: hasChanged,
       room: (room || '').trim(),
       department: normalizeDepartment(department || ''),
       year: normalizeYear(year || ''),

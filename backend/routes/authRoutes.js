@@ -28,9 +28,9 @@ const generateToken = (user, effectiveRole) => {
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
-    const { role, username, password, name, reg, room, studentId, staffId, designation, department, year, email, phone, homeAddress } = req.body;
+    const { role, username, password, name, reg, registerNumber, room, studentId, staffId, designation, department, year, email, phone, homeAddress } = req.body;
 
-    if (!role || !username || !password || !name) {
+    if (!role || !name) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
     }
 
@@ -41,28 +41,30 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    const normalizedUsername = username.trim().toLowerCase();
+    const regNo = (registerNumber || reg || username || '').trim();
+    if (!/^8301[0-9]{8}$/.test(regNo)) {
+      return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
+    }
+
+    const normalizedUsername = (username || regNo).trim().toLowerCase();
 
     // Check if student already exists in students collection
     const userExists = await Student.findOne({
       $or: [
         { username: normalizedUsername },
         { studentId: new RegExp('^' + normalizedUsername + '$', 'i') },
-        { reg: normalizedUsername },
-        { registerNumber: normalizedUsername }
+        { reg: regNo },
+        { registerNumber: regNo }
       ]
     });
 
     if (userExists) {
       return res.status(400).json({
         success: false,
-        message: 'That Student ID / Register No is already registered — log in instead.'
+        message: 'That Register No is already registered — log in instead.'
       });
     }
 
-    if (!/^8301[0-9]{8}$/.test(reg)) {
-      return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
-    }
     if (!/^[0-9]+$/.test(room)) {
       return res.status(400).json({ success: false, message: 'Room No. must be numbers only.' });
     }
@@ -96,13 +98,17 @@ router.post('/signup', async (req, res) => {
     const finalDepartment = normalizeDepartment(department);
     const finalYear = normalizeYear(year);
 
+    const initialPassword = password || regNo;
+    const hasChanged = Boolean(password && password !== regNo);
+
     const student = await Student.create({
       name: name.trim(),
       username: normalizedUsername,
-      registerNumber: reg || '',
-      reg: reg || '',
+      registerNumber: regNo,
+      reg: regNo,
       studentId: studentId || normalizedUsername,
-      password,
+      password: initialPassword,
+      hasChangedPassword: hasChanged,
       role: 'student',
       room: room ? String(room).trim() : '',
       department: finalDepartment,
@@ -162,22 +168,29 @@ router.post('/login', async (req, res) => {
 
     // 1. STUDENT LOGIN -> check students collection
     if (reqRole === 'student') {
-      if (!/^8301[0-9]{8}$/.test(password)) {
+      if (!/^8301[0-9]{8}$/.test(normalizedUsername)) {
         return res.status(400).json({ success: false, message: 'Register No. must be 12 digits, starting with 8301.' });
       }
 
       user = await Student.findOne({
         $or: [
-          { username: normalizedUsername },
-          { studentId: new RegExp('^' + normalizedUsername + '$', 'i') },
+          { registerNumber: normalizedUsername },
           { reg: normalizedUsername },
-          { registerNumber: normalizedUsername }
+          { username: normalizedUsername },
+          { studentId: new RegExp('^' + normalizedUsername + '$', 'i') }
         ]
       });
 
       if (!user) {
         // Fallback to legacy User collection if not yet migrated
-        user = await User.findOne({ username: normalizedUsername, role: 'student' });
+        user = await User.findOne({
+          $or: [
+            { reg: normalizedUsername },
+            { username: normalizedUsername },
+            { studentId: normalizedUsername }
+          ],
+          role: 'student'
+        });
       }
 
       sessionRole = 'student';
@@ -250,7 +263,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         success: false,
         message: reqRole === 'student'
-          ? 'No match. Check your Student ID, and remember the password is your Register No.'
+          ? 'No match. Check your Register Number or contact Admin.'
           : 'No matching account. Check your details or contact Admin.'
       });
     }
@@ -262,12 +275,23 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const isMatch = await user.matchPassword(password);
+    let isMatch = await user.matchPassword(password);
+
+    // If student hasn't changed password yet, also allow matching against plain default register number if bcrypt compare failed (e.g. if legacy record was unhashed)
+    if (!isMatch && reqRole === 'student' && !user.hasChangedPassword) {
+      const studentReg = user.registerNumber || user.reg || user.username || '';
+      if (studentReg && password === studentReg) {
+        isMatch = true;
+        user.password = password;
+        await user.save();
+      }
+    }
+
     if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: reqRole === 'student'
-          ? 'No match. Check your Student ID, and remember the password is your Register No.'
+          ? 'Invalid password. Please check your credentials.'
           : 'Invalid credentials.'
       });
     }
@@ -789,16 +813,16 @@ router.post('/api/auth/faculty/reset-password', facultyResetPasswordHandler);
 // =====================================================================
 
 // @route   POST /api/auth/student/forgot-password
-// @desc    Initiate password reset for Student account via Student ID + Email
+// @desc    Initiate password reset for Student account via Register Number / Student ID + Email
 // @access  Public
 router.post('/student/forgot-password', async (req, res) => {
   try {
-    const { studentId, username, email } = req.body;
-    const inputStudentId = (studentId || username || '').trim();
+    const { studentId, username, registerNumber, reg, email } = req.body;
+    const inputStudentId = (registerNumber || reg || studentId || username || '').trim();
     const inputEmail = (email || '').trim().toLowerCase();
 
     if (!inputStudentId) {
-      return res.status(400).json({ success: false, message: 'Please enter your Student ID.' });
+      return res.status(400).json({ success: false, message: 'Please enter your Register Number.' });
     }
     if (!inputEmail) {
       return res.status(400).json({ success: false, message: 'Please enter your registered email address.' });
@@ -808,16 +832,17 @@ router.post('/student/forgot-password', async (req, res) => {
 
     let studentUser = await Student.findOne({
       $or: [
-        { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { registerNumber: cleanStudentId },
         { reg: cleanStudentId },
-        { registerNumber: cleanStudentId }
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
       ]
     });
 
     if (!studentUser) {
       studentUser = await User.findOne({
         $or: [
+          { reg: cleanStudentId },
           { username: cleanStudentId },
           { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
         ],
@@ -828,7 +853,7 @@ router.post('/student/forgot-password', async (req, res) => {
     if (!studentUser) {
       return res.status(404).json({
         success: false,
-        message: 'No student account found with that Student ID.'
+        message: 'No student account found with that Register Number.'
       });
     }
 
@@ -836,7 +861,7 @@ router.post('/student/forgot-password', async (req, res) => {
     if (!registeredEmail || registeredEmail !== inputEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Email does not match the registered email for this Student ID.'
+        message: 'Email does not match the registered email for this student.'
       });
     }
 
@@ -845,11 +870,11 @@ router.post('/student/forgot-password', async (req, res) => {
     const mailResult = await sendEmail({
       to: studentUser.email,
       subject: 'GCES Kaveri Hostel - Student Password Reset OTP',
-      text: `Hello ${studentUser.name || 'Student'},\n\nYour OTP for password reset (Student ID: ${studentUser.studentId || studentUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
+      text: `Hello ${studentUser.name || 'Student'},\n\nYour OTP for password reset (Register No: ${studentUser.registerNumber || studentUser.reg || studentUser.username}) is: ${otp}\nThis OTP is valid for 5 minutes.\nIf you did not request a password reset, please ignore this message.\n\nRegards,\nGCES Kaveri Hostel Administration`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #2A2140; max-width: 500px; margin: 0 auto; border: 1px solid #EAD9BE; border-radius: 12px; background-color: #FBF6EC;">
           <h2 style="color: #9E1B32; margin-top: 0;">GCES Kaveri Hostel</h2>
-          <p style="font-size: 14px;">Hello <strong>${studentUser.name || 'Student'}</strong> (${studentUser.studentId || studentUser.username}),</p>
+          <p style="font-size: 14px;">Hello <strong>${studentUser.name || 'Student'}</strong> (${studentUser.registerNumber || studentUser.reg || studentUser.username}),</p>
           <p style="font-size: 14px;">Your OTP for resetting your student account password is:</p>
           <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #127A6E; padding: 12px 20px; background: #EAF6F4; display: inline-block; border-radius: 8px; margin: 12px 0; border: 1px solid #127A6E;">${otp}</div>
           <p style="font-size: 13px; color: #7A7290;">This OTP will expire in 5 minutes.</p>
@@ -860,7 +885,7 @@ router.post('/student/forgot-password', async (req, res) => {
     });
 
     if (!mailResult.success) {
-      console.error(`[Student Reset] Email dispatch failed for ${studentUser.studentId || studentUser.username}: ${mailResult.error}`);
+      console.error(`[Student Reset] Email dispatch failed for ${studentUser.registerNumber || studentUser.username}: ${mailResult.error}`);
       return res.status(500).json({
         success: false,
         message: 'Unable to send OTP at the moment. Please contact the administrator.'
@@ -886,23 +911,23 @@ router.post('/student/forgot-password', async (req, res) => {
 // @access  Public
 router.post('/student/verify-otp', async (req, res) => {
   try {
-    const { studentId, username, email, otp } = req.body;
-    const inputStudentId = (studentId || username || '').trim();
+    const { studentId, username, registerNumber, reg, email, otp } = req.body;
+    const inputStudentId = (registerNumber || reg || studentId || username || '').trim();
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
 
     if (!inputStudentId || !cleanEmail || !cleanOtp) {
-      return res.status(400).json({ success: false, message: 'Student ID, Email, and OTP are required.' });
+      return res.status(400).json({ success: false, message: 'Register Number, Email, and OTP are required.' });
     }
 
     const cleanStudentId = inputStudentId.toLowerCase();
 
     let studentUser = await Student.findOne({
       $or: [
-        { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { registerNumber: cleanStudentId },
         { reg: cleanStudentId },
-        { registerNumber: cleanStudentId }
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
       ],
       email: cleanEmail
     });
@@ -910,6 +935,7 @@ router.post('/student/verify-otp', async (req, res) => {
     if (!studentUser) {
       studentUser = await User.findOne({
         $or: [
+          { reg: cleanStudentId },
           { username: cleanStudentId },
           { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
         ],
@@ -919,7 +945,7 @@ router.post('/student/verify-otp', async (req, res) => {
     }
 
     if (!studentUser) {
-      return res.status(404).json({ success: false, message: 'Invalid Student ID or Email.' });
+      return res.status(404).json({ success: false, message: 'Invalid Register Number or Email.' });
     }
 
     if (!studentUser.resetOtp || studentUser.resetOtp !== cleanOtp) {
@@ -945,13 +971,13 @@ router.post('/student/verify-otp', async (req, res) => {
 // @access  Public
 router.post('/student/reset-password', async (req, res) => {
   try {
-    const { studentId, username, email, otp, newPassword } = req.body;
-    const inputStudentId = (studentId || username || '').trim();
+    const { studentId, username, registerNumber, reg, email, otp, newPassword } = req.body;
+    const inputStudentId = (registerNumber || reg || studentId || username || '').trim();
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanOtp = (otp || '').trim();
 
     if (!inputStudentId || !cleanEmail || !cleanOtp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Student ID, Email, OTP, and new password are required.' });
+      return res.status(400).json({ success: false, message: 'Register Number, Email, OTP, and new password are required.' });
     }
 
     if (newPassword.length < 4) {
@@ -962,10 +988,10 @@ router.post('/student/reset-password', async (req, res) => {
 
     let studentUser = await Student.findOne({
       $or: [
-        { username: cleanStudentId },
-        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') },
+        { registerNumber: cleanStudentId },
         { reg: cleanStudentId },
-        { registerNumber: cleanStudentId }
+        { username: cleanStudentId },
+        { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
       ],
       email: cleanEmail
     });
@@ -973,6 +999,7 @@ router.post('/student/reset-password', async (req, res) => {
     if (!studentUser) {
       studentUser = await User.findOne({
         $or: [
+          { reg: cleanStudentId },
           { username: cleanStudentId },
           { studentId: new RegExp('^' + cleanStudentId + '$', 'i') }
         ],
@@ -994,6 +1021,7 @@ router.post('/student/reset-password', async (req, res) => {
     }
 
     studentUser.password = newPassword;
+    studentUser.hasChangedPassword = true;
     studentUser.resetOtp = '';
     studentUser.resetOtpExpire = null;
 

@@ -78,6 +78,10 @@ const StudentSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  hasChangedPassword: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

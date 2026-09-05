@@ -61,7 +61,11 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
 
   const [year, setYear] = useState('I Year');
 
-  // Student form state
+  // Student login form state
+  const [studentLoginReg, setStudentLoginReg] = useState('');
+  const [studentLoginPassword, setStudentLoginPassword] = useState('');
+
+  // Student signup form state
   const [studentId, setStudentId] = useState('');
   const [regNo, setRegNo] = useState('');
   const [roomNo, setRoomNo] = useState('');
@@ -97,15 +101,17 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
     e.preventDefault();
     setError('');
     if (role === 'student') {
-      if (!studentId.trim() || !regNo.trim()) {
-        setError('Enter your Student ID and Register No. as password.');
+      const cleanReg = studentLoginReg.trim();
+      const cleanPass = studentLoginPassword;
+      if (!cleanReg || !cleanPass) {
+        setError('Please enter both Register Number and Password.');
         return;
       }
-      if (!/^8301[0-9]{8}$/.test(regNo.trim())) {
+      if (!/^8301[0-9]{8}$/.test(cleanReg)) {
         setError('Register No. must be 12 digits, starting with 8301.');
         return;
       }
-      onLogin({ role: 'student', username: studentId.trim(), password: regNo.trim() });
+      onLogin({ role: 'student', username: cleanReg, password: cleanPass });
     } else {
       if (!staffId.trim() || !staffPass.trim()) {
         setError(role === 'faculty' ? 'Enter your Faculty ID and password.' : 'Enter your Warden ID and password.');
@@ -271,21 +277,21 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
               {role === 'student' ? (
                 <>
                   <div className="gkof-field">
-                    <label>Student ID</label>
+                    <label>Register Number</label>
                     <input
-                      placeholder="e.g. 24cs526"
-                      value={studentId}
-                      onChange={(e) => setStudentId(e.target.value)}
+                      placeholder="Enter 12-digit Register Number"
+                      maxLength={12}
+                      inputMode="numeric"
+                      value={studentLoginReg}
+                      onChange={(e) => setStudentLoginReg(e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
                     />
                   </div>
                   <div className="gkof-field" style={{ marginBottom: '6px' }}>
-                    <label>Password (your Register No.)</label>
+                    <label>Password</label>
                     <PasswordInput
-                      placeholder="8301XXXXXXXX"
-                      maxLength={12}
-                      inputMode="numeric"
-                      value={regNo}
-                      onChange={(e) => handleRegChange(e.target.value)}
+                      placeholder="Enter Password"
+                      value={studentLoginPassword}
+                      onChange={(e) => setStudentLoginPassword(e.target.value)}
                     />
                   </div>
                   <div className="gkof-forgot-wrap">
@@ -624,7 +630,7 @@ export default function Auth({ onLogin, onSignup, error, setError }) {
       <StudentForgotPasswordModal
         isOpen={showStudentResetModal}
         onClose={() => setShowStudentResetModal(false)}
-        initialStudentId={studentId}
+        initialRegisterNumber={studentLoginReg}
       />
     </div>
   );
@@ -893,9 +899,9 @@ function WardenForgotPasswordModal({ isOpen, onClose, initialWardenId = '' }) {
   );
 }
 
-function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) {
+function StudentForgotPasswordModal({ isOpen, onClose, initialRegisterNumber = '' }) {
   const [step, setStep] = useState('email'); // 'email' | 'otp' | 'password' | 'success'
-  const [studentId, setStudentId] = useState(initialStudentId);
+  const [registerNumber, setRegisterNumber] = useState(initialRegisterNumber);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -905,16 +911,16 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && initialStudentId) {
-      setStudentId(initialStudentId);
+    if (isOpen && initialRegisterNumber) {
+      setRegisterNumber(initialRegisterNumber);
     }
-  }, [isOpen, initialStudentId]);
+  }, [isOpen, initialRegisterNumber]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setStep('email');
-    setStudentId('');
+    setRegisterNumber('');
     setEmail('');
     setOtp('');
     setNewPassword('');
@@ -929,8 +935,13 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
     setError('');
     setInfoMsg('');
 
-    if (!studentId.trim()) {
-      setError('Please enter your Student ID.');
+    const cleanReg = registerNumber.trim();
+    if (!cleanReg) {
+      setError('Please enter your Register Number.');
+      return;
+    }
+    if (!/^8301[0-9]{8}$/.test(cleanReg)) {
+      setError('Register No. must be 12 digits, starting with 8301.');
       return;
     }
     if (!email.trim()) {
@@ -943,7 +954,11 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
       const res = await fetch('/api/auth/student/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: studentId.trim(), email: email.trim() })
+        body: JSON.stringify({
+          registerNumber: cleanReg,
+          studentId: cleanReg,
+          email: email.trim()
+        })
       });
       const d = await res.json();
       return { data: d, error: !res.ok || !d.success ? (d.message || 'Failed to send OTP.') : null };
@@ -966,10 +981,16 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
       return;
     }
     setLoading(true);
+    const cleanReg = registerNumber.trim();
     const res = await fetch('/api/auth/student/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: studentId.trim(), email: email.trim(), otp: otp.trim() })
+      body: JSON.stringify({
+        registerNumber: cleanReg,
+        studentId: cleanReg,
+        email: email.trim(),
+        otp: otp.trim()
+      })
     });
     const d = await res.json();
     setLoading(false);
@@ -999,10 +1020,17 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
       return;
     }
     setLoading(true);
+    const cleanReg = registerNumber.trim();
     const res = await fetch('/api/auth/student/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: studentId.trim(), email: email.trim(), otp: otp.trim(), newPassword: newPassword.trim() })
+      body: JSON.stringify({
+        registerNumber: cleanReg,
+        studentId: cleanReg,
+        email: email.trim(),
+        otp: otp.trim(),
+        newPassword: newPassword.trim()
+      })
     });
     const d = await res.json();
     setLoading(false);
@@ -1034,15 +1062,17 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
         {step === 'email' && (
           <form onSubmit={handleSendEmail}>
             <p className="gkof-modal-desc">
-              Enter your Student ID and its registered email address to receive a 6-digit verification OTP.
+              Enter your 12-digit Register Number and its registered email address to receive a 6-digit verification OTP.
             </p>
             <div className="gkof-field">
-              <label>Student ID</label>
+              <label>Register Number</label>
               <input
                 type="text"
-                placeholder="e.g. 24cs526"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="e.g. 830124104019"
+                maxLength={12}
+                inputMode="numeric"
+                value={registerNumber}
+                onChange={(e) => setRegisterNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
                 autoFocus
               />
             </div>
@@ -1090,12 +1120,12 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
         {step === 'password' && (
           <form onSubmit={handleResetPassword}>
             <p className="gkof-modal-desc">
-              OTP verified! Enter and confirm a new password for Student ID <strong>{studentId}</strong>.
+              OTP verified! Enter and confirm a new password for Student (Register Number: <strong>{registerNumber}</strong>).
             </p>
             <div className="gkof-field">
               <label>New Password</label>
               <PasswordInput
-                placeholder="Enter new password"
+                placeholder="Enter new password (e.g. Deva@123)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
@@ -1121,7 +1151,7 @@ function StudentForgotPasswordModal({ isOpen, onClose, initialStudentId = '' }) 
               Password Updated Successfully!
             </h3>
             <p className="gkof-modal-desc" style={{ marginBottom: '20px' }}>
-              The password for Student account <strong>{studentId}</strong> has been updated. You can now log in with your new credentials.
+              The password for Student account (Register No: <strong>{registerNumber}</strong>) has been updated. Your old Register Number will no longer work as password. You can now log in with your new credentials.
             </p>
             <button className="gkof-btn wide maroon" onClick={handleClose}>
               Back to Student Login
