@@ -64,18 +64,6 @@ export default function StudentProfile({
   const [missingError, setMissingError] = useState('');
   const [missingSuccessMsg, setMissingSuccessMsg] = useState('');
 
-  // Change Password state
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPass, setShowCurrentPass] = useState(false);
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmPass, setShowConfirmPass] = useState(false);
-  const [changingPass, setChangingPass] = useState(false);
-  const [changePassError, setChangePassError] = useState('');
-  const [changePassSuccess, setChangePassSuccess] = useState('');
-
   const initial = (session.name || '?').trim().charAt(0).toUpperCase() || '?';
 
   useEffect(() => {
@@ -190,64 +178,6 @@ export default function StudentProfile({
       setMissingError(err.message || 'Failed to save profile details.');
     } finally {
       setSavingMissing(false);
-    }
-  };
-
-  const handleChangePassword = async (e) => {
-    if (e) e.preventDefault();
-    setChangePassError('');
-    setChangePassSuccess('');
-
-    if (!currentPassword) {
-      setChangePassError('Please enter your current password.');
-      return;
-    }
-    if (!newPassword) {
-      setChangePassError('Please enter a new password.');
-      return;
-    }
-    if (newPassword.length < 4) {
-      setChangePassError('Password must be at least 4 characters long.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setChangePassError('New password and confirmation do not match.');
-      return;
-    }
-
-    try {
-      setChangingPass(true);
-      const token = localStorage.getItem('gkof_token');
-      const res = await fetch('/api/students/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-          confirmPassword
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to update password.');
-      }
-
-      setChangePassSuccess(data.message || 'Password updated successfully! Please use your new password for future logins.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        setChangePassSuccess('');
-        setShowChangePassword(false);
-      }, 3500);
-    } catch (err) {
-      setChangePassError(err.message || 'Error updating password.');
-    } finally {
-      setChangingPass(false);
     }
   };
 
@@ -376,12 +306,6 @@ export default function StudentProfile({
         <div className="gkof-profile-row">
           <span className="k">Register Number</span>
           <span className="v">{session.reg || session.registerNumber || '—'}</span>
-        </div>
-
-        {/* Student ID - Read-only */}
-        <div className="gkof-profile-row">
-          <span className="k">Student ID</span>
-          <span className="v">{session.studentId || session.username || '—'}</span>
         </div>
 
         {/* Department - Editable */}
@@ -561,176 +485,6 @@ export default function StudentProfile({
             <span style={{ fontSize: '16px', color: 'var(--ink-soft)', fontWeight: 'bold' }}>❯</span>
           </div>
         </div>
-      </div>
-
-      {/* Security & Password Section */}
-      <div className="gkof-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ background: 'var(--gold-soft)', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-              🔒
-            </div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '15px' }}>Security &amp; Password</h3>
-              <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
-                Change your password from default Register Number to a custom password
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="gkof-btn ghost"
-            onClick={() => {
-              setShowChangePassword(prev => !prev);
-              setChangePassError('');
-              setChangePassSuccess('');
-            }}
-            style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid var(--gold-soft)' }}
-          >
-            {showChangePassword ? 'Cancel' : 'Change Password'}
-          </button>
-        </div>
-
-        {showChangePassword && (
-          <form onSubmit={handleChangePassword} style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--gold-soft)' }}>
-            {changePassError && (
-              <div style={{ color: 'var(--red, #9E1B32)', fontSize: '13px', fontWeight: 600, marginBottom: '12px', background: '#FDECEF', padding: '8px 12px', borderRadius: '6px', border: '1px solid #F5B5C2' }}>
-                ⚠️ {changePassError}
-              </div>
-            )}
-            {changePassSuccess && (
-              <div style={{ color: 'var(--green, #127A6E)', fontSize: '13px', fontWeight: 600, marginBottom: '12px', background: '#EAF6F4', padding: '8px 12px', borderRadius: '6px', border: '1px solid #127A6E' }}>
-                ✓ {changePassSuccess}
-              </div>
-            )}
-
-            <div className="gkof-field" style={{ marginBottom: '12px' }}>
-              <label style={{ fontWeight: 600, fontSize: '13px' }}>
-                Current Password <span style={{ color: 'var(--red, #9E1B32)' }}>*</span>
-              </label>
-              <div className="gkof-pass-wrap">
-                <input
-                  type={showCurrentPass ? 'text' : 'password'}
-                  placeholder="Enter current password (default is Register No.)"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPass(prev => !prev)}
-                  className="gkof-pass-toggle-btn"
-                  title={showCurrentPass ? 'Hide password' : 'Show password'}
-                >
-                  {showCurrentPass ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="gkof-field" style={{ marginBottom: '12px' }}>
-              <label style={{ fontWeight: 600, fontSize: '13px' }}>
-                New Password <span style={{ color: 'var(--red, #9E1B32)' }}>*</span>
-              </label>
-              <div className="gkof-pass-wrap">
-                <input
-                  type={showNewPass ? 'text' : 'password'}
-                  placeholder="Enter new password (e.g. Deva@123)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPass(prev => !prev)}
-                  className="gkof-pass-toggle-btn"
-                  title={showNewPass ? 'Hide password' : 'Show password'}
-                >
-                  {showNewPass ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <div className="gkof-note" style={{ marginTop: '4px' }}>
-                Allowed: uppercase, lowercase, numbers, and special characters (e.g. Deva@123, Kaveri#2026).
-              </div>
-            </div>
-
-            <div className="gkof-field" style={{ marginBottom: '16px' }}>
-              <label style={{ fontWeight: 600, fontSize: '13px' }}>
-                Confirm New Password <span style={{ color: 'var(--red, #9E1B32)' }}>*</span>
-              </label>
-              <div className="gkof-pass-wrap">
-                <input
-                  type={showConfirmPass ? 'text' : 'password'}
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPass(prev => !prev)}
-                  className="gkof-pass-toggle-btn"
-                  title={showConfirmPass ? 'Hide password' : 'Show password'}
-                >
-                  {showConfirmPass ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                type="submit"
-                className="gkof-btn teal"
-                disabled={changingPass}
-                style={{ padding: '8px 20px', fontSize: '13px' }}
-              >
-                {changingPass ? 'Updating...' : 'Update Password'}
-              </button>
-              <button
-                type="button"
-                className="gkof-btn ghost"
-                onClick={() => {
-                  setShowChangePassword(false);
-                  setChangePassError('');
-                  setChangePassSuccess('');
-                }}
-                disabled={changingPass}
-                style={{ padding: '8px 16px', fontSize: '13px' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
       </div>
 
       <div className="gkof-card">
