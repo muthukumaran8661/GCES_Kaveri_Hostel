@@ -24,17 +24,6 @@ export default function SettingsModal({ currentTheme = 'system', onThemeChange, 
     }
   ];
 
-  const features = [
-    { icon: '📝', title: 'Student Outpass Requests', desc: 'Quick submission of outpass requests with auto-filled hometown destination' },
-    { icon: '👨‍🏫', title: 'Faculty Advisor Approval', desc: 'Department & year-specific academic advisor review and verification' },
-    { icon: '🛡️', title: 'Warden Approval', desc: 'Hostel administration clearance and final authorization' },
-    { icon: '📞', title: 'Parent Confirmation', desc: 'Parent phone verification and communication logging' },
-    { icon: '⚡', title: 'Outpass Ready Status', desc: 'Real-time multi-stage approval workflow tracking' },
-    { icon: '📱', title: 'QR Code Generation', desc: 'Tamper-evident dynamic QR pass generation for hostel gate check-in/out' },
-    { icon: '📜', title: 'Request History', desc: 'Complete historical logs of past outpasses, timestamps & statuses' },
-    { icon: '🔑', title: 'Password Recovery', desc: 'Secure OTP-based email verification and password reset' },
-    { icon: '🎨', title: 'Theme Settings', desc: 'Customizable visual themes including Light Mode, Dark Mode & System Default' }
-  ];
 
   return (
     <div
@@ -219,27 +208,64 @@ export default function SettingsModal({ currentTheme = 'system', onThemeChange, 
                 </div>
               </div>
 
-              {/* Features List */}
+              {/* Contact Info */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold font-serif uppercase tracking-wider text-[var(--ink-soft)]">
-                  Key Features
+                  Contact Info
                 </h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {features.map((feat, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded-lg border border-[var(--line)] bg-[var(--card)] flex items-start gap-2.5"
-                    >
-                      <span className="text-base flex-shrink-0 mt-0.5">{feat.icon}</span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-[var(--ink)]">{feat.title}</div>
-                        <div className="text-[11px] text-[var(--ink-soft)] leading-normal mt-0.5">
-                          {feat.desc}
+                <div className="p-3.5 rounded-xl border border-[var(--line)] space-y-3 bg-[var(--card)]">
+                  {/* Address */}
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-base flex-shrink-0 mt-0.5">📍</span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--ink)]">Address</div>
+                      <div className="text-[11px] text-[var(--ink-soft)] leading-relaxed mt-0.5">
+                        Government College of Engineering – Srirangam,<br />
+                        Trichy – Madurai Highway,<br />
+                        Sethurappatti Road, Trichy – 620012
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="flex items-start gap-2.5 border-t border-[var(--line)] pt-2.5">
+                    <span className="text-base flex-shrink-0 mt-0.5">☎</span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--ink)]">Phone</div>
+                      <div className="text-[11px] text-[var(--ink-soft)] leading-relaxed mt-0.5 space-y-0.5">
+                        <div>Office – 948008656</div>
+                        <div>Hostel – 9488091653</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex items-start gap-2.5 border-t border-[var(--line)] pt-2.5">
+                    <span className="text-base flex-shrink-0 mt-0.5">✉</span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--ink)]">Email</div>
+                      <div className="text-[11px] text-[var(--ink-soft)] leading-relaxed mt-0.5 space-y-0.5">
+                        <div>
+                          <a href="mailto:principal@gces.edu.in" className="hover:text-[var(--maroon)] hover:underline">
+                            principal@gces.edu.in
+                          </a>
+                        </div>
+                        <div>
+                          <a href="mailto:gcessrirangam@gmail.com" className="hover:text-[var(--maroon)] hover:underline">
+                            gcessrirangam@gmail.com
+                          </a>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
+              </div>
+
+              {/* Developed By */}
+              <div className="text-center pt-1">
+                <p className="text-[11px] text-[var(--ink-soft)] font-medium">
+                  Developed by CSE | Muthukumaran G
+                </p>
               </div>
 
               {/* Back to Settings Button */}
