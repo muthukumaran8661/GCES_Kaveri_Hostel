@@ -264,7 +264,7 @@ export default function SettingsModal({ currentTheme = 'system', onThemeChange, 
               {/* Developed By */}
               <div className="text-center pt-1">
                 <p className="text-[11px] text-[var(--ink-soft)] font-medium">
-                  Developed by <span className="text-[var(--gold)]">CSE | Muthukumaran G</span>
+                  Developed by <span className="text-[#60A5FA]" style={{ fontFamily: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }}>CSE | Muthukumaran G</span>
                 </p>
               </div>
 
