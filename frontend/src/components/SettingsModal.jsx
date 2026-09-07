@@ -262,10 +262,30 @@ export default function SettingsModal({ currentTheme = 'system', onThemeChange, 
               </div>
 
               {/* Developed By */}
-              <div className="text-center pt-1">
+              <div className="text-center pt-1 flex flex-col items-center gap-1.5">
                 <p className="text-[11px] text-[var(--ink-soft)] font-medium">
                   Developed by <span className="text-[#60A5FA]" style={{ fontFamily: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }}>CSE | Muthukumaran G</span>
                 </p>
+                <a
+                  href="https://www.linkedin.com/in/muthukumaran-g-539286399/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn Profile - Muthukumaran G"
+                  className="inline-flex items-center justify-center transition-all duration-200 hover:scale-110 hover:opacity-90 hover:brightness-110 cursor-pointer"
+                >
+                  <svg
+                    className="w-[18px] h-[18px] rounded-[3px] shadow-xs"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect width="24" height="24" rx="4" fill="#0A66C2" />
+                    <path
+                      fill="#FFFFFF"
+                      d="M19 19h-3.14v-4.92c0-1.17-.02-2.68-1.63-2.68-1.63 0-1.88 1.28-1.88 2.6v5H9.21V8.87h3.01v1.38h.04c.42-.8 1.45-1.64 2.99-1.64 3.2 0 3.79 2.11 3.79 4.85V19zM6.16 7.49a1.82 1.82 0 1 1 0-3.64 1.82 1.82 0 0 1 0 3.64zM4.59 19h3.14V8.87H4.59V19z"
+                    />
+                  </svg>
+                </a>
               </div>
 
               {/* Back to Settings Button */}
