@@ -53,15 +53,17 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
-    // BACKEND DATE & TIME VALIDATION
-    const now = new Date();
-    const yearNum = now.getFullYear();
-    const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${yearNum}-${monthStr}-${dayStr}`;
-    const hoursStr = String(now.getHours()).padStart(2, '0');
-    const minsStr = String(now.getMinutes()).padStart(2, '0');
-    const currentHHmm = `${hoursStr}:${minsStr}`;
+    // 1. STUDENT REQUEST SUBMISSION WINDOW VALIDATION: Monday-Friday 9:30 AM → 4:30 PM ONLY
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const currentDay = istNow.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+    const currentMins = istNow.getHours() * 60 + istNow.getMinutes();
+
+    if (currentDay < 1 || currentDay > 5 || currentMins < 570 || currentMins > 990) {
+      return res.status(400).json({
+        success: false,
+        message: 'Out Pass requests can be submitted only Monday to Friday between 9:30 AM and 4:30 PM.'
+      });
+    }
 
     const fromParts = String(fromDate).split('T');
     const toParts = String(toDate).split('T');
@@ -73,46 +75,13 @@ router.post('/', protect, async (req, res) => {
     const [fromDatePart, fromTimePart] = fromParts;
     const [toDatePart, toTimePart] = toParts;
 
-    // 1. OUT DATE & TIME restrictions (06:00 to 18:00)
-    if (fromDatePart < todayStr) {
-      return res.status(400).json({ success: false, message: 'Out Date cannot be in the past. Only Today and future dates are allowed.' });
-    }
-    if (fromTimePart < '06:00' || fromTimePart > '18:00') {
-      return res.status(400).json({ success: false, message: 'Out Time must be between 06:00 AM and 06:00 PM.' });
-    }
-    if (fromDatePart === todayStr && fromDate < `${todayStr}T${currentHHmm}`) {
-      return res.status(400).json({ success: false, message: 'Out Date & Time cannot be in the past.' });
-    }
-
-    // 2. EXPECTED RETURN restrictions (06:00 to 18:00)
-    if (toDatePart < todayStr) {
-      return res.status(400).json({ success: false, message: 'Expected Return date cannot be in the past. Only Today and future dates are allowed.' });
-    }
-    if (toTimePart < '06:00' || toTimePart > '18:00') {
-      return res.status(400).json({ success: false, message: 'Expected Return time must be between 06:00 AM and 06:00 PM.' });
-    }
-    if (toDatePart === todayStr && toDate < `${todayStr}T${currentHHmm}`) {
-      return res.status(400).json({ success: false, message: 'Expected Return date & time cannot be in the past.' });
-    }
-
-    // 3. Expected Return > Out Date & Time
-    const fromTimeMs = new Date(fromDate).getTime();
-    const toTimeMs = new Date(toDate).getTime();
-    if (isNaN(fromTimeMs) || isNaN(toTimeMs)) {
-      return res.status(400).json({ success: false, message: 'Invalid Out or Return Date & Time.' });
-    }
-
-    if (toTimeMs <= fromTimeMs) {
-      return res.status(400).json({ success: false, message: 'Expected Return date & time must be after Out Date & Time.' });
-    }
-
     const validTypes = ['weekday', 'weekend', 'weekday_govt'];
     if (!validTypes.includes(requestType)) {
       return res.status(400).json({ success: false, message: 'Selected outpass type is not valid for the selected date and time.' });
     }
     const type = requestType;
 
-    // SERVER-SIDE REQUEST TYPE TIMING VALIDATION
+    // 2. SELECTED OUT DATE + OUT TIME CONTROLS WHETHER THE SELECTED OUT PASS TYPE IS VALID
     const [yNum, mNum, dNum] = fromDatePart.split('-').map(Number);
     const [hNum, minNum] = fromTimePart.split(':').map(Number);
     const outDateObj = new Date(yNum, mNum - 1, dNum);
@@ -121,9 +90,9 @@ router.post('/', protect, async (req, res) => {
 
     const invalidTypeMessage = 'Selected outpass type is not valid for the selected date and time.';
 
-    // 1. WEEKEND OUT PASS: Friday 4:31 PM (991 mins) → Friday 6:00 PM (1080 mins) ONLY
+    // 1. Weekend Out Pass (Warden Approval): Friday only, 4:31 PM (991 mins) to 6:30 PM (1110 mins). 4:30 PM or earlier and after 6:30 PM = invalid
     if (type === 'weekend') {
-      if (dayOfWeek !== 5 || outMinutes < 991 || outMinutes > 1080) {
+      if (dayOfWeek !== 5 || outMinutes < 991 || outMinutes > 1110) {
         return res.status(400).json({
           success: false,
           message: invalidTypeMessage
@@ -131,9 +100,9 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    // 2. WEEKDAY / EMERGENCY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 4:30 PM (990 mins)
+    // 2. Weekday / Emergency Out Pass (Faculty & Warden Approval): Monday to Friday only, 5:00 AM (300 mins) to 4:30 PM (990 mins). 4:31 PM onwards = invalid
     else if (type === 'weekday') {
-      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 990) {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 300 || outMinutes > 990) {
         return res.status(400).json({
           success: false,
           message: invalidTypeMessage
@@ -141,14 +110,67 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    // 3. WEEKDAY / GOVERNMENT HOLIDAY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 6:00 PM (1080 mins)
+    // 3. Weekday / Government Holiday Out Pass (Warden Approval): Monday to Friday only, 5:00 AM (300 mins) to 6:30 PM (1110 mins). 6:31 PM onwards = invalid
     else if (type === 'weekday_govt') {
-      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 1080) {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 300 || outMinutes > 1110) {
         return res.status(400).json({
           success: false,
           message: invalidTypeMessage
         });
       }
+    }
+
+    // GENERAL DATE & TIME RESTRICTIONS
+    const yearNum = istNow.getFullYear();
+    const monthStr = String(istNow.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(istNow.getDate()).padStart(2, '0');
+    const todayStr = `${yearNum}-${monthStr}-${dayStr}`;
+    const hoursStr = String(istNow.getHours()).padStart(2, '0');
+    const minsStr = String(istNow.getMinutes()).padStart(2, '0');
+    const currentHHmm = `${hoursStr}:${minsStr}`;
+
+    // Out Date cannot be in the past
+    if (fromDatePart < todayStr) {
+      return res.status(400).json({ success: false, message: 'Out Date cannot be in the past. Only Today and future dates are allowed.' });
+    }
+    if (fromDatePart === todayStr && fromDate < `${todayStr}T${currentHHmm}`) {
+      return res.status(400).json({ success: false, message: 'Out Date & Time cannot be in the past.' });
+    }
+
+    // EXPECTED RETURN DATE & TIME VALIDATION
+    const returnErrorMsg = 'Please select a valid return date and time. Return date must be within 7 days and return time must be between 5:00 AM and 6:30 PM.';
+
+    const [oy, om, od] = fromDatePart.split('-').map(Number);
+    const maxReturnDateObj = new Date(oy, om - 1, od + 7);
+    const maxRy = maxReturnDateObj.getFullYear();
+    const maxRm = String(maxReturnDateObj.getMonth() + 1).padStart(2, '0');
+    const maxRd = String(maxReturnDateObj.getDate()).padStart(2, '0');
+    const maxReturnDateStr = `${maxRy}-${maxRm}-${maxRd}`;
+
+    // 1. Return date cannot be before Out Date or before today
+    if (toDatePart < fromDatePart || toDatePart < todayStr) {
+      return res.status(400).json({ success: false, message: returnErrorMsg });
+    }
+
+    // 2. Maximum return date is 7 days from Out Date
+    if (toDatePart > maxReturnDateStr) {
+      return res.status(400).json({ success: false, message: returnErrorMsg });
+    }
+
+    // 3. Return time must be between 5:00 AM (05:00) and 6:30 PM (18:30)
+    if (toTimePart < '05:00' || toTimePart > '18:30') {
+      return res.status(400).json({ success: false, message: returnErrorMsg });
+    }
+
+    if (toDatePart === todayStr && toDate < `${todayStr}T${currentHHmm}`) {
+      return res.status(400).json({ success: false, message: returnErrorMsg });
+    }
+
+    // 4. Expected Return must be strictly after Out Date & Time
+    const fromTimeMs = new Date(fromDate).getTime();
+    const toTimeMs = new Date(toDate).getTime();
+    if (isNaN(fromTimeMs) || isNaN(toTimeMs) || toTimeMs <= fromTimeMs) {
+      return res.status(400).json({ success: false, message: returnErrorMsg });
     }
 
     // DYNAMIC MASTER ASSIGNMENT ROUTING & VALIDATION

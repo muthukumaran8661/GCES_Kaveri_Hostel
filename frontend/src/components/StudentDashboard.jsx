@@ -10,6 +10,7 @@ function TimePicker12Hour({
   minVal,
   ampmVal,
   minDateStr,
+  maxDateStr,
   onDateChange,
   onHourChange,
   onMinChange,
@@ -31,6 +32,7 @@ function TimePicker12Hour({
           required
           type="date"
           min={minDateStr}
+          max={maxDateStr}
           value={dateVal}
           onChange={(e) => onDateChange(e.target.value)}
           style={{ flex: '2 1 120px', minWidth: '120px' }}
@@ -69,7 +71,7 @@ function TimePicker12Hour({
         </div>
       ) : (
         <div style={{ fontSize: '11px', color: 'var(--ink-soft)', marginTop: '4px' }}>
-          Select Date &amp; 12-Hour Time (06:00 AM – 06:00 PM)
+          Select Date &amp; 12-Hour Time (05:00 AM – 06:30 PM)
         </div>
       )}
     </div>
@@ -153,14 +155,14 @@ export default function StudentDashboard({
 
   // 12-hour AM/PM Out Date & Time state
   const [outDate, setOutDate] = useState('');
-  const [outHour, setOutHour] = useState('06');
+  const [outHour, setOutHour] = useState('05');
   const [outMin, setOutMin] = useState('00');
-  const [outAmpm, setOutAmpm] = useState('AM');
+  const [outAmpm, setOutAmpm] = useState('PM');
 
   // 12-hour AM/PM Expected Return state
   const [returnDate, setReturnDate] = useState('');
   const [returnHour, setReturnHour] = useState('06');
-  const [returnMin, setReturnMin] = useState('00');
+  const [returnMin, setReturnMin] = useState('30');
   const [returnAmpm, setReturnAmpm] = useState('PM');
 
   const [travel, setTravel] = useState('Bus');
@@ -243,20 +245,45 @@ export default function StudentDashboard({
     return h * 60 + m;
   };
 
+  // 1. STUDENT REQUEST SUBMISSION WINDOW VALIDATION: Monday-Friday 9:30 AM → 4:30 PM ONLY
+  const validateSubmissionWindow = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+    const mins = now.getHours() * 60 + now.getMinutes();
+
+    if (day < 1 || day > 5 || mins < 570 || mins > 990) {
+      return {
+        isValid: false,
+        error: 'Out Pass requests can be submitted only Monday to Friday between 9:30 AM and 4:30 PM.'
+      };
+    }
+    return { isValid: true, error: '' };
+  };
+
+  const getMaxReturnDateStr = (dateStr) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + 7);
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const validateOutPassDates = (oDate, oHour, oMin, oAmpm, rDate, rHour, rMin, rAmpm) => {
     const now = new Date();
     const todayStr = getLocalDateString(now);
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // 1. OUT DATE & TIME Restrictions (06:00 AM - 06:00 PM)
+    // 1. OUT DATE & TIME Restrictions (05:00 AM - 06:30 PM)
     if (oDate) {
       if (oDate < todayStr) {
         return { isValid: false, error: 'Out Date cannot be in the past. Only Today and future dates are allowed.' };
       }
 
       const oMins = getMinutesFromMidnight(oHour, oMin, oAmpm);
-      if (oMins < 360 || oMins > 1080) {
-        return { isValid: false, error: 'Out Time must be between 06:00 AM and 06:00 PM.' };
+      if (oMins < 300 || oMins > 1110) {
+        return { isValid: false, error: 'Out Time must be between 05:00 AM and 06:30 PM.' };
       }
 
       if (oDate === todayStr && oMins < currentMinutes) {
@@ -264,28 +291,34 @@ export default function StudentDashboard({
       }
     }
 
-    // 2. EXPECTED RETURN Restrictions (06:00 AM - 06:00 PM)
+    // 2. EXPECTED RETURN Restrictions (within 7 days of Out Date, 05:00 AM - 06:30 PM, no weekday/weekend restriction)
     if (rDate) {
+      const returnErrorMsg = 'Please select a valid return date and time. Return date must be within 7 days and return time must be between 5:00 AM and 6:30 PM.';
+
       if (rDate < todayStr) {
-        return { isValid: false, error: 'Expected Return date cannot be in the past. Only Today and future dates are allowed.' };
+        return { isValid: false, error: returnErrorMsg };
       }
 
       const rMins = getMinutesFromMidnight(rHour, rMin, rAmpm);
-      if (rMins < 360 || rMins > 1080) {
-        return { isValid: false, error: 'Expected Return time must be between 06:00 AM and 06:00 PM.' };
+      if (rMins < 300 || rMins > 1110) {
+        return { isValid: false, error: returnErrorMsg };
       }
 
       if (rDate === todayStr && rMins < currentMinutes) {
-        return { isValid: false, error: 'Expected Return date & time cannot be in the past.' };
+        return { isValid: false, error: returnErrorMsg };
       }
-    }
 
-    // 3. Expected Return must be strictly after Out Date & Time
-    if (oDate && rDate) {
-      const fromIso = getIsoString(oDate, oHour, oMin, oAmpm);
-      const toIso = getIsoString(rDate, rHour, rMin, rAmpm);
-      if (new Date(toIso) <= new Date(fromIso)) {
-        return { isValid: false, error: 'Expected Return date & time must be after Out Date & Time.' };
+      if (oDate) {
+        const maxReturnDateStr = getMaxReturnDateStr(oDate);
+        if (rDate < oDate || rDate > maxReturnDateStr) {
+          return { isValid: false, error: returnErrorMsg };
+        }
+
+        const fromIso = getIsoString(oDate, oHour, oMin, oAmpm);
+        const toIso = getIsoString(rDate, rHour, rMin, rAmpm);
+        if (new Date(toIso) <= new Date(fromIso)) {
+          return { isValid: false, error: returnErrorMsg };
+        }
       }
     }
 
@@ -307,9 +340,9 @@ export default function StudentDashboard({
 
     const invalidMsg = 'Selected outpass type is not valid for the selected date and time.';
 
-    // 1. WEEKEND OUT PASS: Friday 4:31 PM (991 mins) → Friday 6:00 PM (1080 mins) ONLY
+    // 1. WEEKEND OUT PASS: Friday 4:31 PM (991 mins) → Friday 6:30 PM (1110 mins) ONLY
     if (type === 'weekend') {
-      if (dayOfWeek !== 5 || outMinutes < 991 || outMinutes > 1080) {
+      if (dayOfWeek !== 5 || outMinutes < 991 || outMinutes > 1110) {
         return {
           isValid: false,
           error: invalidMsg,
@@ -319,9 +352,9 @@ export default function StudentDashboard({
       }
     }
 
-    // 2. WEEKDAY / EMERGENCY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 4:30 PM (990 mins)
+    // 2. WEEKDAY / EMERGENCY OUT PASS: Monday - Friday 5:00 AM (300 mins) → 4:30 PM (990 mins)
     else if (type === 'weekday') {
-      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 990) {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 300 || outMinutes > 990) {
         return {
           isValid: false,
           error: invalidMsg,
@@ -331,9 +364,9 @@ export default function StudentDashboard({
       }
     }
 
-    // 3. WEEKDAY / GOVERNMENT HOLIDAY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 6:00 PM (1080 mins)
+    // 3. WEEKDAY / GOVERNMENT HOLIDAY OUT PASS: Monday - Friday 5:00 AM (300 mins) → 6:30 PM (1110 mins)
     else if (type === 'weekday_govt') {
-      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 1080) {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 300 || outMinutes > 1110) {
         return {
           isValid: false,
           error: invalidMsg,
@@ -360,15 +393,15 @@ export default function StudentDashboard({
     setOutAmpm(newAmpm);
 
     if (newDate) {
-      const check = validateOutPassDates(newDate, newHour, newMin, newAmpm, returnDate, returnHour, returnMin, returnAmpm);
-      if (!check.isValid) {
-        setDateError(check.error);
-        return;
-      }
       const typeCheck = validateOutPassType(newDate, newHour, newMin, newAmpm, requestType);
       if (!typeCheck.isValid) {
         setDateError(typeCheck.error);
         alert(typeCheck.popupMessage);
+        return;
+      }
+      const check = validateOutPassDates(newDate, newHour, newMin, newAmpm, returnDate, returnHour, returnMin, returnAmpm);
+      if (!check.isValid) {
+        setDateError(check.error);
       } else {
         setDateError('');
       }
@@ -380,14 +413,17 @@ export default function StudentDashboard({
     setReturnHour(newHour);
     setReturnMin(newMin);
     setReturnAmpm(newAmpm);
+    if (outDate) {
+      const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, requestType);
+      if (!typeCheck.isValid) {
+        setDateError(typeCheck.error);
+        return;
+      }
+    }
     const check = validateOutPassDates(outDate, outHour, outMin, outAmpm, newDate, newHour, newMin, newAmpm);
     if (!check.isValid) {
       setDateError(check.error);
-      return;
-    }
-    const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, requestType);
-    if (!typeCheck.isValid) {
-      setDateError(typeCheck.error);
+      alert(check.error);
     } else {
       setDateError('');
     }
@@ -419,6 +455,14 @@ export default function StudentDashboard({
     e.preventDefault();
 
     if (isSubmitting) return;
+
+    // 1. Current Submission Time window validation
+    const windowCheck = validateSubmissionWindow();
+    if (!windowCheck.isValid) {
+      alert(windowCheck.error);
+      return;
+    }
+
     if (cooldownSeconds > 0) {
       alert(`Please wait ${cooldownSeconds} seconds before submitting another outpass request.`);
       return;
@@ -434,17 +478,18 @@ export default function StudentDashboard({
       return;
     }
 
-    const val = validateOutPassDates(outDate, outHour, outMin, outAmpm, returnDate, returnHour, returnMin, returnAmpm);
-    if (!val.isValid) {
-      alert(val.error);
-      setDateError(val.error);
-      return;
-    }
-
+    // 2. Selected Out Date + Out Time match with Request Type validation
     const typeCheck = validateOutPassType(outDate, outHour, outMin, outAmpm, requestType);
     if (!typeCheck.isValid) {
       alert(typeCheck.popupMessage);
       setDateError(typeCheck.error);
+      return;
+    }
+
+    const val = validateOutPassDates(outDate, outHour, outMin, outAmpm, returnDate, returnHour, returnMin, returnAmpm);
+    if (!val.isValid) {
+      alert(val.error);
+      setDateError(val.error);
       return;
     }
 
@@ -477,12 +522,12 @@ export default function StudentDashboard({
       localStorage.setItem(`gkof_last_req_${usernameKey}`, String(Date.now()));
 
       setOutDate('');
-      setOutHour('06');
+      setOutHour('05');
       setOutMin('00');
-      setOutAmpm('AM');
+      setOutAmpm('PM');
       setReturnDate('');
       setReturnHour('06');
-      setReturnMin('00');
+      setReturnMin('30');
       setReturnAmpm('PM');
       setReason('');
       setDateError('');
@@ -637,7 +682,22 @@ export default function StudentDashboard({
       </div>
 
       <div className="gkof-card">
-        <h3>📝 New Out Pass Request</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ margin: 0 }}>📝 New Out Pass Request</h3>
+          <span style={{
+            fontSize: '11.5px',
+            fontWeight: 600,
+            padding: '4px 10px',
+            borderRadius: '6px',
+            backgroundColor: validateSubmissionWindow().isValid ? '#e6f4ea' : '#fce8e6',
+            color: validateSubmissionWindow().isValid ? '#137333' : '#c5221f',
+            border: `1px solid ${validateSubmissionWindow().isValid ? '#ceead6' : '#fad2cf'}`
+          }}>
+            {validateSubmissionWindow().isValid
+              ? '🟢 Request Window Open (Mon–Fri 9:30 AM – 4:30 PM)'
+              : '🔴 Submission Window: Mon–Fri 9:30 AM – 4:30 PM only'}
+          </span>
+        </div>
 
         <form onSubmit={handleFormSubmit}>
           <div className="gkof-row">
@@ -706,6 +766,7 @@ export default function StudentDashboard({
               minVal={returnMin}
               ampmVal={returnAmpm}
               minDateStr={outDate || todayDateStr}
+              maxDateStr={outDate ? getMaxReturnDateStr(outDate) : ''}
               onDateChange={(d) => handleReturnChange(d, returnHour, returnMin, returnAmpm)}
               onHourChange={(h) => handleReturnChange(returnDate, h, returnMin, returnAmpm)}
               onMinChange={(m) => handleReturnChange(returnDate, returnHour, m, returnAmpm)}
@@ -765,11 +826,11 @@ export default function StudentDashboard({
           <button
             className="gkof-btn maroon wide"
             type="submit"
-            disabled={isSubmitting || cooldownSeconds > 0 || !!dateError}
+            disabled={isSubmitting || cooldownSeconds > 0}
             style={{
               marginTop: '8px',
-              opacity: (isSubmitting || cooldownSeconds > 0 || !!dateError) ? 0.65 : 1,
-              cursor: (isSubmitting || cooldownSeconds > 0 || !!dateError) ? 'not-allowed' : 'pointer'
+              opacity: (isSubmitting || cooldownSeconds > 0) ? 0.65 : 1,
+              cursor: (isSubmitting || cooldownSeconds > 0) ? 'not-allowed' : 'pointer'
             }}
           >
             {isSubmitting
