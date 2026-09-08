@@ -73,23 +73,23 @@ router.post('/', protect, async (req, res) => {
     const [fromDatePart, fromTimePart] = fromParts;
     const [toDatePart, toTimePart] = toParts;
 
-    // 1. OUT DATE & TIME restrictions
+    // 1. OUT DATE & TIME restrictions (06:00 to 18:00)
     if (fromDatePart < todayStr) {
       return res.status(400).json({ success: false, message: 'Out Date cannot be in the past. Only Today and future dates are allowed.' });
     }
-    if (fromTimePart < '05:00' || fromTimePart > '18:00') {
-      return res.status(400).json({ success: false, message: 'Out Time must be between 05:00 AM and 06:00 PM.' });
+    if (fromTimePart < '06:00' || fromTimePart > '18:00') {
+      return res.status(400).json({ success: false, message: 'Out Time must be between 06:00 AM and 06:00 PM.' });
     }
     if (fromDatePart === todayStr && fromDate < `${todayStr}T${currentHHmm}`) {
       return res.status(400).json({ success: false, message: 'Out Date & Time cannot be in the past.' });
     }
 
-    // 2. EXPECTED RETURN restrictions
+    // 2. EXPECTED RETURN restrictions (06:00 to 18:00)
     if (toDatePart < todayStr) {
       return res.status(400).json({ success: false, message: 'Expected Return date cannot be in the past. Only Today and future dates are allowed.' });
     }
-    if (toTimePart < '05:00' || toTimePart > '18:00') {
-      return res.status(400).json({ success: false, message: 'Expected Return time must be between 05:00 AM and 06:00 PM.' });
+    if (toTimePart < '06:00' || toTimePart > '18:00') {
+      return res.status(400).json({ success: false, message: 'Expected Return time must be between 06:00 AM and 06:00 PM.' });
     }
     if (toDatePart === todayStr && toDate < `${todayStr}T${currentHHmm}`) {
       return res.status(400).json({ success: false, message: 'Expected Return date & time cannot be in the past.' });
@@ -107,53 +107,46 @@ router.post('/', protect, async (req, res) => {
     }
 
     const validTypes = ['weekday', 'weekend', 'weekday_govt'];
-    const type = validTypes.includes(requestType) ? requestType : 'weekend';
+    if (!validTypes.includes(requestType)) {
+      return res.status(400).json({ success: false, message: 'Selected outpass type is not valid for the selected date and time.' });
+    }
+    const type = requestType;
 
-    // SERVER-SIDE REQUEST TYPE VALIDATION
+    // SERVER-SIDE REQUEST TYPE TIMING VALIDATION
     const [yNum, mNum, dNum] = fromDatePart.split('-').map(Number);
     const [hNum, minNum] = fromTimePart.split(':').map(Number);
     const outDateObj = new Date(yNum, mNum - 1, dNum);
     const dayOfWeek = outDateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
     const outMinutes = hNum * 60 + minNum;
 
-    // RULE 1 — WEEKDAY / EMERGENCY OUT PASS (Faculty & Warden Approval)
-    if (type === 'weekday') {
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return res.status(400).json({
-          success: false,
-          message: 'Weekday / Emergency Out Pass is valid only from Monday 05:00 AM to Friday 04:30 PM. Please select Weekend Out Pass for weekend dates.'
-        });
-      }
-      if (dayOfWeek === 5 && outMinutes > 990) {
-        return res.status(400).json({
-          success: false,
-          message: 'The selected out time falls under Weekend Out Pass timing. Please select a valid Outpass Type: Weekend Out Pass (Warden Approval).'
-        });
-      }
-    }
+    const invalidTypeMessage = 'Selected outpass type is not valid for the selected date and time.';
 
-    // RULE 2 — WEEKEND OUT PASS (Warden Approval)
+    // 1. WEEKEND OUT PASS: Friday 4:31 PM (991 mins) → Friday 6:00 PM (1080 mins) ONLY
     if (type === 'weekend') {
-      if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+      if (dayOfWeek !== 5 || outMinutes < 991 || outMinutes > 1080) {
         return res.status(400).json({
           success: false,
-          message: 'Weekend Out Pass timing starts from Friday 04:31 PM through Sunday. For weekdays, please select Weekday / Emergency Out Pass or Weekday / Government Holiday Out Pass.'
-        });
-      }
-      if (dayOfWeek === 5 && outMinutes <= 990) {
-        return res.status(400).json({
-          success: false,
-          message: 'Friday timing up to 04:30 PM falls under Weekday Out Pass. Weekend Out Pass timing starts from Friday 04:31 PM.'
+          message: invalidTypeMessage
         });
       }
     }
 
-    // RULE 3 — WEEKDAY / GOVERNMENT HOLIDAY OUT PASS (Warden Approval)
-    if (type === 'weekday_govt') {
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
+    // 2. WEEKDAY / EMERGENCY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 4:30 PM (990 mins)
+    else if (type === 'weekday') {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 990) {
         return res.status(400).json({
           success: false,
-          message: 'Weekday / Government Holiday Out Pass is valid only on weekdays (Monday 05:00 AM to Friday 06:00 PM).'
+          message: invalidTypeMessage
+        });
+      }
+    }
+
+    // 3. WEEKDAY / GOVERNMENT HOLIDAY OUT PASS: Monday - Friday 6:00 AM (360 mins) → 6:00 PM (1080 mins)
+    else if (type === 'weekday_govt') {
+      if (dayOfWeek < 1 || dayOfWeek > 5 || outMinutes < 360 || outMinutes > 1080) {
+        return res.status(400).json({
+          success: false,
+          message: invalidTypeMessage
         });
       }
     }
