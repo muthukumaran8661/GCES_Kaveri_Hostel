@@ -60,10 +60,10 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
 
     if (isFaculty) {
       const isAssignedDirectly = (r.assignedFacultyAdvisorId && r.assignedFacultyAdvisorId.toString() === sessionUserId) ||
-                                 (r.assignedFacultyId && r.assignedFacultyId.toString() === sessionUserId);
+        (r.assignedFacultyId && r.assignedFacultyId.toString() === sessionUserId);
       if (isAssignedDirectly) return true;
       return matchesDepartment(session?.department, r.department) &&
-             matchesYear(session?.year, r.year);
+        matchesYear(session?.year, r.year);
     }
 
     if (isAdminOrWarden) {
@@ -390,7 +390,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const renderAdminControlTable = () => (
     <div className="gkof-card" style={{ borderColor: 'var(--gold)' }}>
       <div style={{ marginBottom: '14px' }}>
-        <h3 style={{ margin: 0 }}>⚙️ Admin Control – Staff Permissions &amp; Management</h3>
+        <h3 style={{ margin: 0 }}>⚙️ Warden Control – Staff Permissions &amp; Management</h3>
         <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--ink-soft)' }}>
           Manage Wardens &amp; Faculty Advisors. Add new staff, edit permissions, department, assigned year, or delete accounts.
         </p>
