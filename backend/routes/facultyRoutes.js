@@ -7,6 +7,7 @@ const { normalizeDepartment, normalizeYear, matchesDepartment, matchesYear } = r
 
 /**
  * Check if student belongs to the Faculty Advisor's assigned Department and Year
+ * Uses the exact same matching logic as Outpass request routing.
  */
 function isStudentInFacultyScope(faculty, student) {
   const facDept = faculty.department;
@@ -15,28 +16,42 @@ function isStudentInFacultyScope(faculty, student) {
 }
 
 // @route   GET /api/faculty/students
-// @desc    Get all students assigned to the logged-in Faculty Advisor + unassigned students in their dept/year
+// @desc    Get all students assigned to the logged-in Faculty Advisor
+//          Automatically includes all students matching Department + Year
 // @access  Private (Faculty Advisor only)
 router.get('/students', protect, protectFaculty, async (req, res) => {
   try {
     const facultyUserId = (req.user._id || req.user.id).toString();
-    const facDept = req.user.department;
-    const facYear = req.user.assignedYear || req.user.year;
+    const facDept = normalizeDepartment(req.user.department);
+    const facYear = normalizeYear(req.user.assignedYear || req.user.year);
 
     // Fetch all students in the database
     const allStudents = await Student.find().select('-password').sort({ name: 1 }).lean();
 
-    // Filter strictly to students matching this Faculty Advisor's Department and Year
-    const deptYearStudents = allStudents.filter(s => isStudentInFacultyScope(req.user, s));
+    // Filter strictly to students matching this Faculty Advisor's Department and Year,
+    // or students explicitly assigned to this Faculty Advisor
+    const assignedStudents = [];
+    const unassignedStudents = [];
 
-    // Split into assigned to this advisor vs unassigned
-    const assignedStudents = deptYearStudents.filter(s =>
-      s.assignedFacultyAdvisorId && s.assignedFacultyAdvisorId.toString() === facultyUserId
-    );
+    allStudents.forEach(s => {
+      const inScope = isStudentInFacultyScope(req.user, s);
+      const isExplicitlyAssigned = s.assignedFacultyAdvisorId && s.assignedFacultyAdvisorId.toString() === facultyUserId;
+      const unassignedList = (s.unassignedFacultyAdvisorIds || []).map(id => id.toString());
+      const isExplicitlyRemoved = unassignedList.includes(facultyUserId);
 
-    const unassignedStudents = deptYearStudents.filter(s =>
-      !s.assignedFacultyAdvisorId
-    );
+      if (inScope) {
+        if (isExplicitlyRemoved && !isExplicitlyAssigned) {
+          // Student was manually removed from this advisor's list
+          unassignedStudents.push(s);
+        } else {
+          // Automatically assigned by matching Department + Year, or explicitly assigned
+          assignedStudents.push(s);
+        }
+      } else if (isExplicitlyAssigned) {
+        // Explicit manual assignment
+        assignedStudents.push(s);
+      }
+    });
 
     return res.json({
       success: true,
@@ -45,7 +60,7 @@ router.get('/students', protect, protectFaculty, async (req, res) => {
         name: req.user.name,
         department: facDept,
         year: facYear,
-        designation: req.user.designation || `${normalizeYear(facYear)} ${facDept} Faculty Advisor`
+        designation: req.user.designation || `${facYear} ${facDept} Faculty Advisor`
       },
       assignedStudents,
       unassignedStudents,
@@ -59,14 +74,14 @@ router.get('/students', protect, protectFaculty, async (req, res) => {
 });
 
 // @route   POST /api/faculty/students/assign
-// @desc    Assign an existing student belonging to this Faculty Advisor's department & year
+// @desc    Assign or re-associate a student to this Faculty Advisor
 // @access  Private (Faculty Advisor only)
 router.post('/students/assign', protect, protectFaculty, async (req, res) => {
   try {
     const { studentId, registerNumber } = req.body;
     const facultyUserId = req.user._id || req.user.id;
-    const facDept = req.user.department;
-    const facYear = req.user.assignedYear || req.user.year;
+    const facDept = normalizeDepartment(req.user.department);
+    const facYear = normalizeYear(req.user.assignedYear || req.user.year);
 
     if (!studentId && !registerNumber) {
       return res.status(400).json({ success: false, message: 'Student ID or Register Number is required.' });
@@ -99,6 +114,10 @@ router.post('/students/assign', protect, protectFaculty, async (req, res) => {
       });
     }
 
+    // Remove from unassigned/excluded list if present
+    student.unassignedFacultyAdvisorIds = (student.unassignedFacultyAdvisorIds || []).filter(
+      id => id.toString() !== facultyUserId.toString()
+    );
     student.assignedFacultyAdvisorId = facultyUserId;
     await student.save();
 
@@ -114,7 +133,7 @@ router.post('/students/assign', protect, protectFaculty, async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Student ${student.name} (${student.registerNumber || student.reg}) successfully assigned to you.`,
+      message: `Student ${student.name} (${student.registerNumber || student.reg}) successfully associated with your Faculty Advisor account.`,
       student: {
         _id: student._id,
         name: student.name,
@@ -216,7 +235,8 @@ router.post('/students/create-and-assign', protect, protectFaculty, async (req, 
       homeAddress: (homeAddress || '').trim(),
       role: 'student',
       status: 'active',
-      assignedFacultyAdvisorId: facultyUserId
+      assignedFacultyAdvisorId: facultyUserId,
+      unassignedFacultyAdvisorIds: []
     });
 
     return res.status(201).json({
@@ -242,53 +262,59 @@ router.post('/students/create-and-assign', protect, protectFaculty, async (req, 
 });
 
 // @route   POST /api/faculty/students/:id/unassign or DELETE /api/faculty/students/:id/unassign
-// @desc    Remove student's assignment from this Faculty Advisor (non-destructive; does not delete student)
+// @desc    Remove student's association from this Faculty Advisor without deleting the student
 // @access  Private (Faculty Advisor only)
 const unassignHandler = async (req, res) => {
   try {
     const studentId = req.params.id;
     const facultyUserId = (req.user._id || req.user.id).toString();
-    const facDept = req.user.department;
-    const facYear = req.user.assignedYear || req.user.year;
+    const facDept = normalizeDepartment(req.user.department);
+    const facYear = normalizeYear(req.user.assignedYear || req.user.year);
 
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student record not found.' });
     }
 
-    // Verify student belongs to this advisor's Department and Year
-    if (!isStudentInFacultyScope(req.user, student)) {
+    // Verify student belongs to this advisor's Department and Year or is currently assigned
+    const inScope = isStudentInFacultyScope(req.user, student);
+    const isExplicitlyAssigned = student.assignedFacultyAdvisorId && student.assignedFacultyAdvisorId.toString() === facultyUserId;
+
+    if (!inScope && !isExplicitlyAssigned) {
       return res.status(403).json({
         success: false,
         message: `Forbidden: You cannot modify students outside your assigned Department (${facDept}) and Year (${facYear}).`
       });
     }
 
-    // Verify student is currently assigned to this advisor
-    if (!student.assignedFacultyAdvisorId || student.assignedFacultyAdvisorId.toString() !== facultyUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Action prohibited: This student is not currently assigned to your account.'
-      });
+    // Add to unassigned/excluded list for this advisor so they don't appear in assignedStudents
+    const unassignedList = (student.unassignedFacultyAdvisorIds || []).map(id => id.toString());
+    if (!unassignedList.includes(facultyUserId)) {
+      student.unassignedFacultyAdvisorIds.push(facultyUserId);
     }
 
-    // Remove assignment only (do not delete student account)
-    student.assignedFacultyAdvisorId = null;
+    // Clear explicit assignment if pointing to this advisor
+    if (student.assignedFacultyAdvisorId && student.assignedFacultyAdvisorId.toString() === facultyUserId) {
+      student.assignedFacultyAdvisorId = null;
+    }
+
     await student.save();
 
     // Also clear from legacy User collection if exists
     try {
-      await User.updateOne(
-        { $or: [{ _id: student._id }, { username: student.username }] },
-        { $set: { assignedFacultyAdvisorId: null } }
-      );
+      if (student.assignedFacultyAdvisorId === null) {
+        await User.updateOne(
+          { $or: [{ _id: student._id }, { username: student.username }] },
+          { $set: { assignedFacultyAdvisorId: null } }
+        );
+      }
     } catch (e) {
       // ignore legacy error
     }
 
     return res.json({
       success: true,
-      message: `Student assignment for ${student.name} (${student.registerNumber || student.reg}) has been removed. The student profile remains active in the system.`,
+      message: `Association for ${student.name} (${student.registerNumber || student.reg}) removed from your list. The student account remains intact in the system.`,
       studentId: student._id
     });
   } catch (error) {
