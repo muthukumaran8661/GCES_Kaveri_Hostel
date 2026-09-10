@@ -50,7 +50,7 @@ function normalizeYear(y) {
   return s;
 }
 
-export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
+export default function TicketCard({ request: r, viewer, onAction, onViewQr, selectable = false, isSelected = false, onToggleSelect }) {
   const meta = STATUS_META[r.status] || { label: r.status, cls: 'bg-gold-soft text-[#8A6100]' };
   const type = r.type;
   const typeLabel = r.type === 'weekday_govt'
@@ -270,8 +270,44 @@ export default function TicketCard({ request: r, viewer, onAction, onViewQr }) {
   const showQrOnPass = viewer === 'student' && (r.status === 'approved_final' || r.status === 'returned');
 
   return (
-    <div className="gkof-ticket">
+    <div className={`gkof-ticket ${isSelected ? 'border-2 border-[#9E1B32] shadow-sm' : ''}`}>
       <div className="gkof-ticket-main">
+        {selectable && (
+          <div style={{ marginBottom: '10px' }}>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                userSelect: 'none',
+                background: isSelected ? '#FDF2F4' : '#F4F4F6',
+                border: `1px solid ${isSelected ? '#9E1B32' : '#D1D5DB'}`,
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                color: isSelected ? '#9E1B32' : '#374151',
+                transition: 'all 0.15s ease'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onToggleSelect && onToggleSelect(displayId)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  accentColor: '#9E1B32',
+                  cursor: 'pointer',
+                  margin: 0
+                }}
+              />
+              <span>{isSelected ? '✓ Selected for Bulk Action' : 'Select for Bulk Action'}</span>
+            </label>
+          </div>
+        )}
         {justStamped && (
           <div className="gkof-stamp">
             {r.status === 'returned' ? <>BACK<br />SAFE</> : <>OUT<br />PASS<br />OK</>}

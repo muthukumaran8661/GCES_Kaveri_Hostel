@@ -529,6 +529,202 @@ router.get('/staff', protect, protectStaffOrFaculty, async (req, res) => {
   }
 });
 
+// @route   POST /api/requests/bulk-action
+// @desc    Bulk approve or decline out pass requests
+// @access  Private (Staff/Faculty/Admin)
+router.post('/bulk-action', protect, protectStaffOrFaculty, async (req, res) => {
+  try {
+    const { requestIds, action, reason } = req.body;
+
+    if (!Array.isArray(requestIds) || requestIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'No request IDs provided for bulk action.' });
+    }
+
+    const validActions = ['faculty_approved', 'faculty_rejected', 'staff_approved', 'staff_rejected'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ success: false, message: 'Invalid action provided for bulk action.' });
+    }
+
+    // Role-based action constraint
+    if (action.startsWith('faculty_') && req.user.role !== 'faculty' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '403 Forbidden: Only Faculty Advisors can perform Faculty bulk actions.' });
+    }
+    if (action.startsWith('staff_') && req.user.role !== 'staff' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '403 Forbidden: Only Wardens can perform Warden bulk actions.' });
+    }
+
+    // Pre-fetch active wardens if faculty approving to avoid querying inside loop
+    let activeWardens = [];
+    if (action === 'faculty_approved') {
+      activeWardens = await Warden.find({ status: 'active' }).lean();
+      if (!activeWardens || activeWardens.length === 0) {
+        activeWardens = await Staff.find({ role: 'staff', status: 'active' }).lean();
+      }
+    }
+
+    const results = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    // Deduplicate request IDs
+    const uniqueIds = Array.from(new Set(requestIds));
+
+    for (const reqId of uniqueIds) {
+      try {
+        const request = await findRequestById(reqId);
+        if (!request) {
+          failedCount++;
+          results.push({ id: reqId, success: false, message: 'Out pass request not found.' });
+          continue;
+        }
+
+        // Prevent duplicate processing if request is already approved, rejected, or returned
+        if (['faculty_rejected', 'staff_rejected', 'parent_rejected', 'returned'].includes(request.status) ||
+            request.currentApprovalStage === 'REJECTED' || request.currentApprovalStage === 'RETURNED') {
+          failedCount++;
+          results.push({ id: reqId, requestId: request.requestId, success: false, message: `Request is already ${request.status}.` });
+          continue;
+        }
+
+        // Faculty Action Validations
+        if (action === 'faculty_approved' || action === 'faculty_rejected') {
+          // Check if request is in pending faculty stage
+          const isPendingFaculty = request.status === 'pending_faculty' || request.currentApprovalStage === 'FACULTY';
+          if (!isPendingFaculty) {
+            failedCount++;
+            results.push({ id: reqId, requestId: request.requestId, success: false, message: 'Request is not awaiting Faculty Advisor approval.' });
+            continue;
+          }
+
+          // Check authorization for faculty
+          if (req.user.role === 'faculty') {
+            const isAssignedDirectly = (request.assignedFacultyAdvisorId && request.assignedFacultyAdvisorId.toString() === req.user._id.toString()) ||
+                                       (request.assignedFacultyId && request.assignedFacultyId.toString() === req.user._id.toString());
+            const deptMatches = matchesDepartment(req.user.department, request.department);
+            const yearMatches = matchesYear(req.user.year || req.user.assignedYear, request.year);
+
+            if (!isAssignedDirectly && (!deptMatches || !yearMatches)) {
+              failedCount++;
+              results.push({
+                id: reqId,
+                requestId: request.requestId,
+                success: false,
+                message: `Unauthorized: Faculty assignment (${req.user.department || 'N/A'} - ${req.user.year || 'N/A'}) does not match student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
+              });
+              continue;
+            }
+          }
+
+          if (action === 'faculty_approved') {
+            request.status = 'pending_staff';
+            request.currentApprovalStage = 'WARDEN';
+            request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
+            request.facultyActionAt = new Date();
+            request.facultyAdvisorApprovedAt = new Date();
+
+            const matchedWardens = findMatchingWardens(activeWardens, request.department, request.year);
+            if (matchedWardens.length > 0) {
+              request.assignedWardenId = matchedWardens[0]._id;
+            }
+            request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Approved (Bulk) — forwarded to Warden`);
+          } else {
+            request.status = 'faculty_rejected';
+            request.currentApprovalStage = 'REJECTED';
+            request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
+            request.facultyActionAt = new Date();
+            request.rejectionReason = reason || 'Declined by Faculty Advisor (Bulk)';
+            request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request (Bulk)`);
+          }
+
+          await request.save();
+          processedCount++;
+          results.push({ id: reqId, requestId: request.requestId, success: true, status: request.status });
+          continue;
+        }
+
+        // Warden Action Validations
+        if (action === 'staff_approved' || action === 'staff_rejected') {
+          // Check if weekday request is still in faculty stage
+          if (request.type === 'weekday' && (request.status === 'pending_faculty' || request.currentApprovalStage === 'FACULTY')) {
+            failedCount++;
+            results.push({ id: reqId, requestId: request.requestId, success: false, message: 'Weekday out pass requires Faculty Advisor approval before Warden approval.' });
+            continue;
+          }
+
+          // Check if request is in pending warden stage
+          const isPendingWarden = request.status === 'pending_staff' || request.status === 'pending_warden' || request.status === 'faculty_approved' || request.currentApprovalStage === 'WARDEN';
+          if (!isPendingWarden) {
+            failedCount++;
+            results.push({ id: reqId, requestId: request.requestId, success: false, message: 'Request is not awaiting Warden approval.' });
+            continue;
+          }
+
+          // Check authorization for warden
+          if (req.user.role === 'staff') {
+            const wardenIdStr = (req.user._id || req.user.id)?.toString();
+            const isAssignedDirectly = request.assignedWardenId && request.assignedWardenId.toString() === wardenIdStr;
+
+            if (!isAssignedDirectly) {
+              const wardenDept = normalizeDepartment(req.user.department);
+              const isGeneralWarden = !wardenDept || wardenDept === 'HOSTEL ADMINISTRATION' || wardenDept === 'ALL DEPARTMENTS';
+              const yearMatches = matchesYear(req.user.year || req.user.assignedYear, request.year);
+              const deptMatches = isGeneralWarden || matchesDepartment(wardenDept, request.department);
+
+              if (!yearMatches && (!deptMatches || !yearMatches)) {
+                failedCount++;
+                results.push({
+                  id: reqId,
+                  requestId: request.requestId,
+                  success: false,
+                  message: `Unauthorized: Warden assignment (${req.user.department || 'General'} - ${req.user.year || 'N/A'}) does not match student (${request.department || 'N/A'} - ${request.year || 'N/A'}).`
+                });
+                continue;
+              }
+            }
+          }
+
+          if (action === 'staff_approved') {
+            request.status = 'notifying_parent';
+            request.currentApprovalStage = 'PARENT';
+            request.wardenActionBy = req.user.name || req.user.username;
+            request.wardenActionAt = new Date();
+            request.wardenApprovedAt = new Date();
+            request.callAttempts = 1;
+            request.log.push(`Warden (${req.user.name}) approved (Bulk) — SMS/WhatsApp link sent, auto-call started (attempt 1)`);
+          } else {
+            request.status = 'staff_rejected';
+            request.currentApprovalStage = 'REJECTED';
+            request.wardenActionBy = req.user.name || req.user.username;
+            request.wardenActionAt = new Date();
+            request.rejectionReason = reason || 'Declined by Warden (Bulk)';
+            request.log.push(`Warden (${req.user.name}) declined the request (Bulk)`);
+          }
+
+          await request.save();
+          processedCount++;
+          results.push({ id: reqId, requestId: request.requestId, success: true, status: request.status });
+          continue;
+        }
+
+      } catch (itemErr) {
+        failedCount++;
+        results.push({ id: reqId, success: false, message: itemErr.message || 'Error processing request.' });
+      }
+    }
+
+    return res.json({
+      success: processedCount > 0,
+      processedCount,
+      failedCount,
+      results,
+      message: `Bulk operation completed: ${processedCount} processed, ${failedCount} failed.`
+    });
+  } catch (error) {
+    console.error('Bulk action error:', error);
+    return res.status(500).json({ success: false, message: 'Server error processing bulk action.' });
+  }
+});
+
 // @route   PATCH /api/requests/:id/action
 // @desc    Update request status / log based on action
 // @access  Private (Staff/Faculty/Student)

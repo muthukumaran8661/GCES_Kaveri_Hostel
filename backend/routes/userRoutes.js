@@ -40,22 +40,8 @@ router.put('/profile', protect, async (req, res) => {
     }
 
     if (userModel === 'student' || user.role === 'student') {
-      // 0. Department is editable for students
-      if (department !== undefined && typeof department === 'string' && department.trim()) {
-        const ALLOWED_DEPTS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Maths', 'Physics', 'English', 'Chemistry', 'Mechatronics'];
-        const normUpper = normalizeDepartment(department.trim());
-        const idx = ALLOWED_DEPTS.map(d => d.toUpperCase()).indexOf(normUpper);
-        if (idx !== -1) {
-          user.department = ALLOWED_DEPTS[idx];
-        }
-      }
-
-      // 1. Year is permanently editable for students
-      if (year !== undefined) {
-        user.year = normalizeYear(year);
-      }
-
-      // 2. Allow completing missing Email ID ONLY if currently missing/empty
+      // Department and Year are strictly READ-ONLY for students from their profile
+      // 1. Allow completing missing Email ID ONLY if currently missing/empty
       if (req.body.email !== undefined) {
         const currentEmail = (user.email || '').trim();
         if (!currentEmail) {

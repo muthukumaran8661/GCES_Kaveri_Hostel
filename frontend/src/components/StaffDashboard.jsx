@@ -129,6 +129,91 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     (r.status === 'approved_final' && r.qrStatus !== 'OUT')
   );
 
+  // Bulk Approval / Decline State
+  const [selectedRequestIds, setSelectedRequestIds] = useState([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkActionType, setBulkActionType] = useState(null); // 'approve' | 'decline'
+  const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
+  const [bulkStatusMsg, setBulkStatusMsg] = useState(null); // { type: 'success' | 'error', text: string }
+
+  // Actionable requests eligible for bulk action:
+  // Faculty: only requests awaiting faculty approval (pending_faculty / stage: FACULTY)
+  // Warden: only requests awaiting warden approval (pending_staff / stage: WARDEN)
+  const actionablePendingRequests = isFaculty
+    ? pendingFaculty
+    : pendingStaff;
+
+  const actionableIds = actionablePendingRequests
+    .map(r => (r.requestId || r.id || r._id)?.toString())
+    .filter(Boolean);
+
+  const validSelectedIds = selectedRequestIds.filter(id => actionableIds.includes(id));
+  const isAllSelected = actionableIds.length > 0 && actionableIds.every(id => validSelectedIds.includes(id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRequestIds([]);
+    } else {
+      setSelectedRequestIds(actionableIds);
+    }
+  };
+
+  const handleToggleSelectOne = (id) => {
+    const idStr = id?.toString();
+    if (!idStr) return;
+    setSelectedRequestIds(prev => {
+      if (prev.includes(idStr)) {
+        return prev.filter(x => x !== idStr);
+      } else {
+        return [...prev, idStr];
+      }
+    });
+  };
+
+  const handleExecuteBulkAction = async () => {
+    if (validSelectedIds.length === 0) return;
+    setBulkProcessing(true);
+    setBulkStatusMsg(null);
+    try {
+      const action = isFaculty
+        ? (bulkActionType === 'approve' ? 'faculty_approved' : 'faculty_rejected')
+        : (bulkActionType === 'approve' ? 'staff_approved' : 'staff_rejected');
+
+      const res = await apiFetch('/api/requests/bulk-action', 'POST', {
+        requestIds: validSelectedIds,
+        action,
+        reason: bulkActionType === 'decline' ? (isFaculty ? 'Bulk declined by Faculty Advisor' : 'Bulk declined by Warden') : undefined
+      });
+
+      setShowBulkConfirmModal(false);
+      setSelectedRequestIds([]);
+
+      if (res.processedCount > 0) {
+        setBulkStatusMsg({
+          type: 'success',
+          text: `✅ Successfully ${bulkActionType === 'approve' ? 'approved' : 'declined'} ${res.processedCount} student request(s).${res.failedCount > 0 ? ` (${res.failedCount} skipped or failed)` : ''}`
+        });
+      } else {
+        setBulkStatusMsg({
+          type: 'error',
+          text: `⚠️ No requests could be processed. ${res.message || ''}`
+        });
+      }
+
+      if (onRefreshUsers) {
+        await onRefreshUsers();
+      }
+    } catch (err) {
+      console.error('Bulk action failed:', err);
+      setBulkStatusMsg({
+        type: 'error',
+        text: `❌ Bulk action error: ${err.message || 'Operation failed'}`
+      });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const handleDownloadHistoryPdf = async () => {
@@ -1587,9 +1672,169 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           Action Queue <span className="count">{queue.length}</span>
           {isFaculty && <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--ink-soft)', marginLeft: '10px' }}>({session.department} - {session.year} only)</span>}
         </h3>
+
+        {/* Bulk Action Feedback Message */}
+        {bulkStatusMsg && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              marginBottom: '14px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: bulkStatusMsg.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+              color: bulkStatusMsg.type === 'success' ? '#065F46' : '#991B1B',
+              border: `1px solid ${bulkStatusMsg.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <span>{bulkStatusMsg.text}</span>
+            <button
+              onClick={() => setBulkStatusMsg(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                color: 'inherit'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Bulk Action Controls Toolbar */}
+        {actionablePendingRequests.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '12px 16px',
+              background: '#F9FAFB',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              marginBottom: '16px'
+            }}
+          >
+            {/* Left: Select All Checkbox & Count */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13.5px',
+                  color: '#1F2937',
+                  userSelect: 'none'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={handleToggleSelectAll}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    accentColor: '#9E1B32',
+                    cursor: 'pointer',
+                    margin: 0
+                  }}
+                />
+                <span>Select All ({actionablePendingRequests.length})</span>
+              </label>
+
+              <span
+                style={{
+                  fontSize: '12.5px',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  background: validSelectedIds.length > 0 ? '#FDF2F4' : '#E5E7EB',
+                  color: validSelectedIds.length > 0 ? '#9E1B32' : '#6B7280',
+                  fontWeight: 600
+                }}
+              >
+                {validSelectedIds.length} of {actionablePendingRequests.length} selected
+              </span>
+            </div>
+
+            {/* Right: Bulk Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                className="gkof-btn green"
+                disabled={validSelectedIds.length === 0 || bulkProcessing}
+                onClick={() => {
+                  setBulkActionType('approve');
+                  setShowBulkConfirmModal(true);
+                }}
+                style={{
+                  opacity: validSelectedIds.length === 0 || bulkProcessing ? 0.5 : 1,
+                  cursor: validSelectedIds.length === 0 || bulkProcessing ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: 700
+                }}
+              >
+                <span>✓ Approve Selected</span>
+                {validSelectedIds.length > 0 && <span>({validSelectedIds.length})</span>}
+              </button>
+
+              <button
+                type="button"
+                className="gkof-btn red"
+                disabled={validSelectedIds.length === 0 || bulkProcessing}
+                onClick={() => {
+                  setBulkActionType('decline');
+                  setShowBulkConfirmModal(true);
+                }}
+                style={{
+                  opacity: validSelectedIds.length === 0 || bulkProcessing ? 0.5 : 1,
+                  cursor: validSelectedIds.length === 0 || bulkProcessing ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: 700
+                }}
+              >
+                <span>✕ Decline Selected</span>
+                {validSelectedIds.length > 0 && <span>({validSelectedIds.length})</span>}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           {queue.length ? (
-            queue.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={onAction} />)
+            queue.map(r => {
+              const rId = (r.requestId || r.id || r._id)?.toString();
+              const isSelectable = actionableIds.includes(rId);
+              const isSelected = validSelectedIds.includes(rId);
+              return (
+                <TicketCard
+                  key={rId}
+                  request={r}
+                  viewer="staff"
+                  onAction={onAction}
+                  selectable={isSelectable}
+                  isSelected={isSelected}
+                  onToggleSelect={handleToggleSelectOne}
+                />
+              );
+            })
           ) : (
             <div className="gkof-empty">
               {isFaculty ? `No pending requests for ${session.department || 'CSE'} (${session.year || '1st Year'}) students right now.` : 'Nothing needs action right now.'}
@@ -1627,6 +1872,96 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           </button>
         )}
       </div>
+
+      {/* Bulk Action Confirmation Modal */}
+      {showBulkConfirmModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              background: '#FFF',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px', color: '#1F2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {bulkActionType === 'approve' ? '✅ Confirm Bulk Approval' : '⚠️ Confirm Bulk Decline'}
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '14px', color: '#4B5563', lineHeight: '1.5' }}>
+              Are you sure you want to <b>{bulkActionType === 'approve' ? 'APPROVE' : 'DECLINE'}</b> all{' '}
+              <b>{validSelectedIds.length}</b> selected student request(s)?
+            </p>
+            <div
+              style={{
+                background: bulkActionType === 'approve' ? '#F0FDF4' : '#FEF2F2',
+                border: `1px solid ${bulkActionType === 'approve' ? '#BBF7D0' : '#FECACA'}`,
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                fontSize: '12.5px',
+                color: bulkActionType === 'approve' ? '#166534' : '#991B1B'
+              }}
+            >
+              {isFaculty ? (
+                bulkActionType === 'approve'
+                  ? 'ℹ️ These requests will be marked Faculty Approved and immediately forwarded to the Hostel Warden.'
+                  : 'ℹ️ These requests will be marked Faculty Declined.'
+              ) : (
+                bulkActionType === 'approve'
+                  ? 'ℹ️ These requests will be marked Warden Approved and proceed to parent notification / call verification.'
+                  : 'ℹ️ These requests will be marked Warden Declined.'
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="gkof-btn"
+                onClick={() => setShowBulkConfirmModal(false)}
+                disabled={bulkProcessing}
+                style={{
+                  background: '#F3F4F6',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                  fontWeight: 600,
+                  padding: '8px 16px',
+                  fontSize: '13px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`gkof-btn ${bulkActionType === 'approve' ? 'green' : 'red'}`}
+                onClick={handleExecuteBulkAction}
+                disabled={bulkProcessing}
+                style={{
+                  fontWeight: 700,
+                  padding: '8px 18px',
+                  fontSize: '13px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {bulkProcessing ? 'Processing...' : `Yes, ${bulkActionType === 'approve' ? 'Approve' : 'Decline'} (${validSelectedIds.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showReportModal && (
         <StudentRequestReport

@@ -239,34 +239,6 @@ export default function App() {
     }
   };
 
-  const handleUpdateDepartment = async (newDepartment) => {
-    try {
-      const res = await apiFetch('/api/students/profile/department', 'PATCH', { department: newDepartment });
-      if (res && (res.user || res.student)) {
-        setSession(res.user || res.student);
-      }
-      return res;
-    } catch (err) {
-      console.error('Update department error:', err);
-      alert(err.message || 'Failed to update Department');
-      throw err;
-    }
-  };
-
-  const handleUpdateYear = async (newYear) => {
-    try {
-      const res = await apiFetch('/api/students/profile/year', 'PATCH', { year: newYear });
-      if (res && (res.user || res.student)) {
-        setSession(res.user || res.student);
-      }
-      return res;
-    } catch (err) {
-      console.error('Update year error:', err);
-      alert(err.message || 'Failed to update Year');
-      throw err;
-    }
-  };
-
   const handleSaveMissingDetails = async (payload) => {
     try {
       const res = await apiFetch('/api/users/profile', 'PUT', payload);
@@ -387,8 +359,6 @@ export default function App() {
             ) : currentTab === 'profile' ? (
               <StudentProfile
                 session={session}
-                onUpdateDepartment={handleUpdateDepartment}
-                onUpdateYear={handleUpdateYear}
                 onSaveMissingDetails={handleSaveMissingDetails}
                 onSaveAddress={handleSaveProfileAddress}
                 onLogout={handleLogout}
