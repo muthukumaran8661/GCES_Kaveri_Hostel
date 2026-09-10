@@ -320,6 +320,7 @@ export default function App() {
 
   const isStaffOrFaculty = session && ['staff', 'faculty', 'admin'].includes(session.role);
   const isAdminOrWarden = session && (session.role === 'staff' || session.role === 'admin');
+  const isFaculty = session && session.role === 'faculty';
 
   return (
     <div className="gkof max-w-[1000px] mx-auto">
@@ -357,6 +358,14 @@ export default function App() {
                 onClick={() => { setCurrentTab('admin'); refreshData(); }}
               >
                 ⚙️ Warden Control
+              </div>
+            )}
+            {isFaculty && (
+              <div
+                className={`gkof-tab ${currentTab === 'faculty-control' ? 'active' : ''}`}
+                onClick={() => { setCurrentTab('faculty-control'); refreshData(); }}
+              >
+                ⚙️ Faculty Control
               </div>
             )}
           </div>

@@ -40,6 +40,7 @@ app.use('/api/qr', require('./routes/qrRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
 app.use('/api/staff', require('./routes/staffRoutes'));
 app.use('/api/wardens', require('./routes/wardenRoutes'));
+app.use('/api/faculty', require('./routes/facultyRoutes'));
 
 // Serve Frontend Static Files in Production / Deployment
 const frontendDist = path.join(__dirname, '../frontend/dist');

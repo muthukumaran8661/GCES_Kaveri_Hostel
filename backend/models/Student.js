@@ -61,6 +61,11 @@ const StudentSchema = new mongoose.Schema({
     type: String,
     default: 'student'
   },
+  assignedFacultyAdvisorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Staff',
+    default: null
+  },
   status: {
     type: String,
     enum: ['active', 'inactive'],

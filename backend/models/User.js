@@ -18,6 +18,11 @@ const UserSchema = new mongoose.Schema({
     enum: ['student', 'faculty', 'staff', 'admin'],
     required: true
   },
+  assignedFacultyAdvisorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Staff',
+    default: null
+  },
   name: {
     type: String,
     required: true,

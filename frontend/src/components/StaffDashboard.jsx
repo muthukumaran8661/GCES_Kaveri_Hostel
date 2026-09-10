@@ -179,6 +179,34 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [deletingUser, setDeletingUser] = useState(null);
   const [deletingStaff, setDeletingStaff] = useState(false);
 
+  // Faculty Control State
+  const [facultyStudents, setFacultyStudents] = useState([]);
+  const [unassignedStudents, setUnassignedStudents] = useState([]);
+  const [loadingFacultyStudents, setLoadingFacultyStudents] = useState(false);
+  const [facultySearchQuery, setFacultySearchQuery] = useState('');
+  const [facultyMsg, setFacultyMsg] = useState('');
+  const [facultyError, setFacultyError] = useState('');
+
+  // Add Student Modal State for Faculty
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [addStudentMode, setAddStudentMode] = useState('assign'); // 'assign' | 'create'
+  const [selectedStudentToAssign, setSelectedStudentToAssign] = useState('');
+  const [creatingStudent, setCreatingStudent] = useState(false);
+  const [assigningStudent, setAssigningStudent] = useState(false);
+  const [newStudentForm, setNewStudentForm] = useState({
+    name: '',
+    registerNumber: '',
+    room: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+  const [addStudentError, setAddStudentError] = useState('');
+
+  // Remove Student Confirmation Modal State
+  const [confirmRemoveStudent, setConfirmRemoveStudent] = useState(null);
+  const [removingStudent, setRemovingStudent] = useState(false);
+
   const WARDEN_ORDER_LIST = [];
   const DEPARTMENT_OPTIONS = ['CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Mechatronics', 'Chemistry', 'Maths', 'Physics', 'English'];
   const DEPT_ORDER_MAP = {
@@ -258,6 +286,98 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
       console.error('Error loading staff list:', err);
     } finally {
       setLoadingStaff(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isFaculty) {
+      loadFacultyStudents();
+    }
+  }, [isFaculty, session]);
+
+  async function loadFacultyStudents() {
+    try {
+      setLoadingFacultyStudents(true);
+      setFacultyError('');
+      const res = await apiFetch('/api/faculty/students');
+      if (res.success) {
+        setFacultyStudents(res.assignedStudents || []);
+        setUnassignedStudents(res.unassignedStudents || []);
+      }
+    } catch (err) {
+      console.error('Error loading faculty students:', err);
+      setFacultyError(err.message || 'Failed to load assigned students.');
+    } finally {
+      setLoadingFacultyStudents(false);
+    }
+  }
+
+  async function handleAssignStudent(studentId) {
+    if (!studentId) {
+      setAddStudentError('Please select a student to assign.');
+      return;
+    }
+    try {
+      setAssigningStudent(true);
+      setAddStudentError('');
+      const res = await apiFetch('/api/faculty/students/assign', 'POST', { studentId });
+      if (res.success) {
+        setFacultyMsg(res.message);
+        setShowAddStudentModal(false);
+        setSelectedStudentToAssign('');
+        await loadFacultyStudents();
+        setTimeout(() => setFacultyMsg(''), 4000);
+      }
+    } catch (err) {
+      setAddStudentError(err.message || 'Failed to assign student.');
+    } finally {
+      setAssigningStudent(false);
+    }
+  }
+
+  async function handleCreateAndAssignStudent(e) {
+    e.preventDefault();
+    try {
+      setCreatingStudent(true);
+      setAddStudentError('');
+      const res = await apiFetch('/api/faculty/students/create-and-assign', 'POST', newStudentForm);
+      if (res.success) {
+        setFacultyMsg(res.message);
+        setShowAddStudentModal(false);
+        setNewStudentForm({
+          name: '',
+          registerNumber: '',
+          room: '',
+          email: '',
+          phone: '',
+          password: ''
+        });
+        await loadFacultyStudents();
+        setTimeout(() => setFacultyMsg(''), 4000);
+      }
+    } catch (err) {
+      setAddStudentError(err.message || 'Failed to create student.');
+    } finally {
+      setCreatingStudent(false);
+    }
+  }
+
+  async function handleUnassignStudent() {
+    if (!confirmRemoveStudent) return;
+    try {
+      setRemovingStudent(true);
+      const studentId = confirmRemoveStudent._id || confirmRemoveStudent.id;
+      const res = await apiFetch(`/api/faculty/students/${studentId}/unassign`, 'POST');
+      if (res.success) {
+        setFacultyMsg(res.message);
+        setConfirmRemoveStudent(null);
+        await loadFacultyStudents();
+        setTimeout(() => setFacultyMsg(''), 4000);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to remove student assignment.');
+    } finally {
+      setRemovingStudent(false);
     }
   }
 
@@ -817,10 +937,500 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
     </div>
   );
 
+  const renderFacultyControlTable = () => {
+    const filteredStudents = facultyStudents.filter(s => {
+      if (!facultySearchQuery.trim()) return true;
+      const q = facultySearchQuery.trim().toLowerCase();
+      const name = (s.name || '').toLowerCase();
+      const reg = (s.registerNumber || s.reg || s.username || '').toLowerCase();
+      return name.includes(q) || reg.includes(q);
+    });
+
+    return (
+      <div className="gkof-card" style={{ borderColor: 'var(--gold)' }}>
+        <div style={{ marginBottom: '14px' }}>
+          <h3 style={{ margin: 0 }}>⚙️ Faculty Control – Student Management</h3>
+          <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--ink-soft)' }}>
+            Manage students assigned to your department and year: <b>{session?.department} ({facYearDisplay})</b>
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+            <input
+              type="text"
+              placeholder="🔍 Search by Name or Register No…"
+              value={facultySearchQuery}
+              onChange={e => setFacultySearchQuery(e.target.value)}
+              style={{
+                padding: '7px 12px',
+                fontSize: '12.5px',
+                borderRadius: '8px',
+                border: '1px solid var(--line)',
+                minWidth: '220px',
+                maxWidth: '320px',
+                outline: 'none'
+              }}
+            />
+            <button className="gkof-btn ghost" onClick={loadFacultyStudents} title="Reload assigned students">
+              🔄 Refresh
+            </button>
+            <span style={{ fontSize: '12px', color: 'var(--ink-soft)', fontWeight: 500 }}>
+              {filteredStudents.length} of {facultyStudents.length} student{facultyStudents.length !== 1 ? 's' : ''} assigned
+            </span>
+          </div>
+
+          <div>
+            <button
+              className="gkof-btn green"
+              onClick={() => {
+                setShowAddStudentModal(true);
+                setAddStudentError('');
+                setAddStudentMode(unassignedStudents.length > 0 ? 'assign' : 'create');
+              }}
+            >
+              + Add Student
+            </button>
+          </div>
+        </div>
+
+        {facultyMsg && (
+          <div style={{ background: '#E6F4EA', color: 'var(--green)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px', border: '1px solid var(--green)' }}>
+            ✓ {facultyMsg}
+          </div>
+        )}
+
+        {facultyError && (
+          <div style={{ background: '#FBE4E1', color: 'var(--danger)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px', border: '1px solid var(--danger)' }}>
+            ⚠️ {facultyError}
+          </div>
+        )}
+
+        {loadingFacultyStudents ? (
+          <div className="gkof-empty">Loading assigned students…</div>
+        ) : facultyStudents.length === 0 ? (
+          <div className="gkof-empty" style={{ padding: '36px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', marginBottom: '8px' }}>👨‍🎓</div>
+            <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--ink)', marginBottom: '4px' }}>
+              No students currently assigned
+            </div>
+            <p style={{ fontSize: '12.5px', color: 'var(--ink-soft)', maxWidth: '420px', margin: '0 auto 16px' }}>
+              You do not have any students assigned to your account in {session?.department} ({facYearDisplay}) yet.
+              {unassignedStudents.length > 0 && ` There are ${unassignedStudents.length} unassigned student(s) available.`}
+            </p>
+            <button
+              className="gkof-btn green"
+              onClick={() => {
+                setShowAddStudentModal(true);
+                setAddStudentError('');
+                setAddStudentMode(unassignedStudents.length > 0 ? 'assign' : 'create');
+              }}
+            >
+              + Add Student
+            </button>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="gkof-empty" style={{ padding: '28px 20px' }}>
+            No students matching "{facultySearchQuery}" found in your assigned list.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'var(--cream-soft)', borderBottom: '2px solid var(--gold-soft)', color: 'var(--ink)' }}>
+                  <th style={{ padding: '10px' }}>Student Name</th>
+                  <th style={{ padding: '10px' }}>Register Number</th>
+                  <th style={{ padding: '10px' }}>Department</th>
+                  <th style={{ padding: '10px' }}>Year</th>
+                  <th style={{ padding: '10px' }}>Status</th>
+                  <th style={{ padding: '10px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map(s => (
+                  <tr key={s._id || s.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '10px' }}>
+                      <b>{s.name}</b>
+                      {s.room && <div style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>Room: {s.room}</div>}
+                    </td>
+                    <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '12px' }}>
+                      {s.registerNumber || s.reg || s.username || '—'}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {s.department || '—'}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      {normalizeYear(s.year) || '—'}
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        backgroundColor: s.status === 'inactive' ? '#FCE8E6' : '#E6F4EA',
+                        color: s.status === 'inactive' ? 'var(--red)' : 'var(--green)'
+                      }}>
+                        {s.status === 'inactive' ? 'Inactive' : 'Active'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right' }}>
+                      <button
+                        className="gkof-btn red"
+                        style={{ padding: '4px 10px', fontSize: '11.5px' }}
+                        onClick={() => setConfirmRemoveStudent(s)}
+                      >
+                        🗑 Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Add Student Modal */}
+        {showAddStudentModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+            backdropFilter: 'blur(3px)'
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+              border: '1px solid var(--line)',
+              padding: '24px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--maroon-dark)', fontFamily: 'Roboto Slab, serif' }}>
+                  ➕ Add Student Assignment
+                </h3>
+                <button
+                  onClick={() => setShowAddStudentModal(false)}
+                  style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--ink-soft)' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Department & Year Scope Info Banner */}
+              <div style={{
+                background: '#F9F6F0',
+                border: '1px solid var(--gold-soft)',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                fontSize: '12px',
+                marginBottom: '16px',
+                color: 'var(--ink)'
+              }}>
+                <b>Your Assigned Scope:</b> {session?.department} · {facYearDisplay}
+                <div style={{ fontSize: '11px', color: 'var(--ink-soft)', marginTop: '2px' }}>
+                  Students added or assigned will strictly belong to this Department and Year.
+                </div>
+              </div>
+
+              {/* Mode Toggle */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--line)', paddingBottom: '12px' }}>
+                <button
+                  type="button"
+                  className={`gkof-btn ${addStudentMode === 'assign' ? 'teal' : 'ghost'}`}
+                  style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                  onClick={() => { setAddStudentMode('assign'); setAddStudentError(''); }}
+                >
+                  Assign Existing Student ({unassignedStudents.length})
+                </button>
+                <button
+                  type="button"
+                  className={`gkof-btn ${addStudentMode === 'create' ? 'teal' : 'ghost'}`}
+                  style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                  onClick={() => { setAddStudentMode('create'); setAddStudentError(''); }}
+                >
+                  Register New Student
+                </button>
+              </div>
+
+              {addStudentError && (
+                <div style={{ background: '#FBE4E1', color: 'var(--danger)', padding: '10px 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, marginBottom: '14px', border: '1px solid var(--danger)' }}>
+                  ⚠️ {addStudentError}
+                </div>
+              )}
+
+              {addStudentMode === 'assign' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '6px' }}>
+                    Select Unassigned Student from {session?.department} ({facYearDisplay})
+                  </label>
+                  {unassignedStudents.length === 0 ? (
+                    <div style={{ padding: '16px', background: '#F9F9F9', borderRadius: '8px', fontSize: '12.5px', color: 'var(--ink-soft)', textAlign: 'center', marginBottom: '16px' }}>
+                      No unassigned students available in {session?.department} ({facYearDisplay}).
+                      <div style={{ marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          className="gkof-btn ghost"
+                          style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                          onClick={() => setAddStudentMode('create')}
+                        >
+                          Switch to "Register New Student"
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '16px' }}>
+                      <select
+                        value={selectedStudentToAssign}
+                        onChange={e => setSelectedStudentToAssign(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--line)',
+                          fontSize: '13px',
+                          backgroundColor: '#FFF'
+                        }}
+                      >
+                        <option value="">-- Choose a student to assign --</option>
+                        {unassignedStudents.map(st => (
+                          <option key={st._id} value={st._id}>
+                            {st.name} ({st.registerNumber || st.reg || st.username}) {st.room ? `· Room: ${st.room}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                    <button
+                      type="button"
+                      className="gkof-btn ghost"
+                      onClick={() => setShowAddStudentModal(false)}
+                      disabled={assigningStudent}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="gkof-btn green"
+                      onClick={() => handleAssignStudent(selectedStudentToAssign)}
+                      disabled={assigningStudent || !selectedStudentToAssign}
+                    >
+                      {assigningStudent ? 'Assigning…' : 'Assign Student'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleCreateAndAssignStudent}>
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Student Full Name *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. S. Kavitha"
+                        value={newStudentForm.name}
+                        onChange={e => setNewStudentForm({ ...newStudentForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="gkof-field">
+                      <label>Register Number *</label>
+                      <input
+                        type="text"
+                        placeholder="12 digits, starts with 8301"
+                        value={newStudentForm.registerNumber}
+                        onChange={e => setNewStudentForm({ ...newStudentForm, registerNumber: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Department (Locked to your scope)</label>
+                      <input
+                        type="text"
+                        value={session?.department || 'CSE'}
+                        disabled
+                        style={{ background: '#F5F5F5', color: '#666', cursor: 'not-allowed' }}
+                      />
+                    </div>
+                    <div className="gkof-field">
+                      <label>Academic Year (Locked to your scope)</label>
+                      <input
+                        type="text"
+                        value={facYearDisplay}
+                        disabled
+                        style={{ background: '#F5F5F5', color: '#666', cursor: 'not-allowed' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="gkof-row">
+                    <div className="gkof-field">
+                      <label>Room Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 102"
+                        value={newStudentForm.room}
+                        onChange={e => setNewStudentForm({ ...newStudentForm, room: e.target.value })}
+                      />
+                    </div>
+                    <div className="gkof-field">
+                      <label>Student Phone</label>
+                      <input
+                        type="tel"
+                        placeholder="10-digit number"
+                        value={newStudentForm.phone}
+                        onChange={e => setNewStudentForm({ ...newStudentForm, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="gkof-field">
+                    <label>Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="student@example.com"
+                      value={newStudentForm.email}
+                      onChange={e => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
+                    />
+                  </div>
+
+                  <p style={{ fontSize: '11px', color: 'var(--ink-soft)', margin: '8px 0 16px' }}>
+                    * Initial login password defaults to the student's Register Number.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="gkof-btn ghost"
+                      onClick={() => setShowAddStudentModal(false)}
+                      disabled={creatingStudent}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="gkof-btn green"
+                      disabled={creatingStudent}
+                    >
+                      {creatingStudent ? 'Creating…' : 'Create & Assign'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Remove Student Confirmation Modal */}
+        {confirmRemoveStudent && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+            backdropFilter: 'blur(3px)'
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '440px',
+              width: '100%',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+              border: '2px solid var(--danger)',
+              padding: '24px'
+            }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <span style={{ fontSize: '44px', display: 'block', marginBottom: '8px' }}>⚠️</span>
+                <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--danger)', fontFamily: 'Roboto Slab, serif' }}>
+                  Confirm Removal
+                </h3>
+              </div>
+
+              <p style={{ textAlign: 'center', fontSize: '14px', color: 'var(--ink)', margin: '0 0 16px', fontWeight: 500 }}>
+                Are you sure you want to remove this student's assignment from your Faculty Advisor account?
+              </p>
+
+              <div style={{
+                background: '#FDF2F2',
+                border: '1px solid #F8DAD5',
+                borderRadius: '10px',
+                padding: '14px',
+                marginBottom: '20px',
+                fontSize: '13px',
+                lineHeight: 1.6
+              }}>
+                <div><b>Student Name:</b> {confirmRemoveStudent.name}</div>
+                <div><b>Register Number:</b> {confirmRemoveStudent.registerNumber || confirmRemoveStudent.reg}</div>
+                <div><b>Department:</b> {confirmRemoveStudent.department}</div>
+                <div><b>Year:</b> {confirmRemoveStudent.year}</div>
+                <div style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--ink-soft)' }}>
+                  ℹ️ Note: This only removes the student's assignment to you. The student's login account and history remain intact.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  className="gkof-btn ghost"
+                  style={{ flex: 1 }}
+                  onClick={() => setConfirmRemoveStudent(null)}
+                  disabled={removingStudent}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="gkof-btn red"
+                  style={{ flex: 1 }}
+                  onClick={handleUnassignStudent}
+                  disabled={removingStudent}
+                >
+                  {removingStudent ? 'Removing…' : 'Remove Assignment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (activeTab === 'admin') {
     return (
       <>
         {isAdminOrWarden && renderAdminControlTable()}
+      </>
+    );
+  }
+
+  if (activeTab === 'faculty-control') {
+    return (
+      <>
+        {isFaculty && renderFacultyControlTable()}
       </>
     );
   }
