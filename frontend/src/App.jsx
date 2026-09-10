@@ -356,7 +356,7 @@ export default function App() {
                 className={`gkof-tab ${currentTab === 'admin' ? 'active' : ''}`}
                 onClick={() => { setCurrentTab('admin'); refreshData(); }}
               >
-                ⚙️ Admin Control
+                ⚙️ Warden Control
               </div>
             )}
           </div>
