@@ -1080,7 +1080,8 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
       const q = facultySearchQuery.trim().toLowerCase();
       const name = (s.name || '').toLowerCase();
       const reg = (s.registerNumber || s.reg || s.username || '').toLowerCase();
-      return name.includes(q) || reg.includes(q);
+      const phone = (s.phone || s.studentPhone || s.phoneNumber || '').toLowerCase();
+      return name.includes(q) || reg.includes(q) || phone.includes(q);
     });
 
     return (
@@ -1179,7 +1180,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                   <th style={{ padding: '10px' }}>Register Number</th>
                   <th style={{ padding: '10px' }}>Department</th>
                   <th style={{ padding: '10px' }}>Year</th>
-                  <th style={{ padding: '10px' }}>Status</th>
+                  <th style={{ padding: '10px' }}>Phone Number</th>
                   <th style={{ padding: '10px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -1199,18 +1200,8 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                     <td style={{ padding: '10px' }}>
                       {normalizeYear(s.year) || '—'}
                     </td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        backgroundColor: s.status === 'inactive' ? '#FCE8E6' : '#E6F4EA',
-                        color: s.status === 'inactive' ? 'var(--red)' : 'var(--green)'
-                      }}>
-                        {s.status === 'inactive' ? 'Inactive' : 'Active'}
-                      </span>
+                    <td style={{ padding: '10px', fontSize: '12.5px', color: 'var(--ink)' }}>
+                      {(s.phone || s.studentPhone || s.phoneNumber || '').trim() || '—'}
                     </td>
                     <td style={{ padding: '10px', textAlign: 'right' }}>
                       <button
