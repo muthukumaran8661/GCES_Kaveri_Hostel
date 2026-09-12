@@ -324,11 +324,44 @@ export default function TicketCard({ request: r, viewer, onAction, onViewQr, sel
               <b>Out:</b> {fmtDate(r.fromDate)} &nbsp;→&nbsp; <b>Return:</b> {fmtDate(r.toDate)}<br />
               <b>Reason:</b> {r.reason}<br />
               <b>Parent No.:</b> {r.parentPhone}
+              {r.rejectionReason && (
+                <>
+                  <br />
+                  <span style={{ color: '#991B1B', fontWeight: 600 }}>
+                    <b>Reason for Decline:</b> {r.rejectionReason}
+                  </span>
+                </>
+              )}
             </div>
             {renderTimeline()}
             <span className={`gkof-status ${meta.cls}`}>{meta.label}</span>
             {isAccepted && <div className="gkof-outcome accepted">✅ Your Request was successfully Accepted</div>}
-            {isDeclined && <div className="gkof-outcome declined">❌ Your Request was declined</div>}
+            {isDeclined && (
+              <div className="gkof-outcome declined">
+                <div style={{ fontWeight: 700 }}>❌ Your Request was declined</div>
+                {r.rejectionReason && (
+                  <div style={{ marginTop: '5px', fontSize: '13px', fontWeight: 500, color: '#7F1D1D' }}>
+                    <strong>Reason for Decline:</strong> {r.rejectionReason}
+                  </div>
+                )}
+              </div>
+            )}
+            {viewer === 'staff' && r.rejectionReason && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  padding: '8px 12px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
+                  color: '#991B1B',
+                  lineHeight: '1.4'
+                }}
+              >
+                <strong style={{ fontWeight: 700 }}>Reason for Decline:</strong> {r.rejectionReason}
+              </div>
+            )}
           </div>
 
           {/* Right Column: Dedicated QR Card Container (Student Final Pass Only) */}

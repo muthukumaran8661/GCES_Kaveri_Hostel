@@ -135,6 +135,49 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
   const [bulkActionType, setBulkActionType] = useState(null); // 'approve' | 'decline'
   const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
   const [bulkStatusMsg, setBulkStatusMsg] = useState(null); // { type: 'success' | 'error', text: string }
+  const [bulkDeclineReason, setBulkDeclineReason] = useState('');
+  const [bulkDeclineError, setBulkDeclineError] = useState('');
+
+  // Single Decline Confirmation Modal State
+  const [singleDeclineTarget, setSingleDeclineTarget] = useState(null);
+  const [singleDeclineReason, setSingleDeclineReason] = useState('');
+  const [singleDeclineError, setSingleDeclineError] = useState('');
+  const [singleDeclineSubmitting, setSingleDeclineSubmitting] = useState(false);
+
+  const handleCardAction = (id, act) => {
+    if (act === 'faculty_rejected' || act === 'staff_rejected') {
+      const targetReq = scopedRequests.find(r => (r.requestId || r.id || r._id)?.toString() === id?.toString());
+      setSingleDeclineTarget({
+        id,
+        action: act,
+        request: targetReq
+      });
+      setSingleDeclineReason('');
+      setSingleDeclineError('');
+    } else {
+      onAction(id, act);
+    }
+  };
+
+  const handleConfirmSingleDecline = async () => {
+    if (!singleDeclineTarget) return;
+    const trimmed = singleDeclineReason.trim();
+    if (!trimmed) {
+      setSingleDeclineError('Please enter a reason for declining this request.');
+      return;
+    }
+    setSingleDeclineSubmitting(true);
+    try {
+      await onAction(singleDeclineTarget.id, singleDeclineTarget.action, trimmed);
+      setSingleDeclineTarget(null);
+      setSingleDeclineReason('');
+      setSingleDeclineError('');
+    } catch (err) {
+      setSingleDeclineError(err.message || 'Failed to decline request');
+    } finally {
+      setSingleDeclineSubmitting(false);
+    }
+  };
 
   // Actionable requests eligible for bulk action:
   // Faculty: only requests awaiting faculty approval (pending_faculty / stage: FACULTY)
@@ -172,6 +215,13 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
 
   const handleExecuteBulkAction = async () => {
     if (validSelectedIds.length === 0) return;
+    if (bulkActionType === 'decline') {
+      const trimmed = bulkDeclineReason.trim();
+      if (!trimmed) {
+        setBulkDeclineError('Please enter a reason for declining this request.');
+        return;
+      }
+    }
     setBulkProcessing(true);
     setBulkStatusMsg(null);
     try {
@@ -182,11 +232,13 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
       const res = await apiFetch('/api/requests/bulk-action', 'POST', {
         requestIds: validSelectedIds,
         action,
-        reason: bulkActionType === 'decline' ? (isFaculty ? 'Bulk declined by Faculty Advisor' : 'Bulk declined by Warden') : undefined
+        reason: bulkActionType === 'decline' ? bulkDeclineReason.trim() : undefined
       });
 
       setShowBulkConfirmModal(false);
       setSelectedRequestIds([]);
+      setBulkDeclineReason('');
+      setBulkDeclineError('');
 
       if (res.processedCount > 0) {
         setBulkStatusMsg({
@@ -1577,7 +1629,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
           <h3>Completed &amp; Archived Records <span className="count">{history.length}</span></h3>
           <div>
             {history.length ? (
-              history.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={onAction} />)
+              history.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={handleCardAction} />)
             ) : (
               <div className="gkof-empty">No completed or archived history records found.</div>
             )}
@@ -1797,6 +1849,8 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                 disabled={validSelectedIds.length === 0 || bulkProcessing}
                 onClick={() => {
                   setBulkActionType('decline');
+                  setBulkDeclineReason('');
+                  setBulkDeclineError('');
                   setShowBulkConfirmModal(true);
                 }}
                 style={{
@@ -1828,7 +1882,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                   key={rId}
                   request={r}
                   viewer="staff"
-                  onAction={onAction}
+                  onAction={handleCardAction}
                   selectable={isSelectable}
                   isSelected={isSelected}
                   onToggleSelect={handleToggleSelectOne}
@@ -1848,7 +1902,7 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
         <h3>Students Currently Out <span className="count">{activeOut.length}</span></h3>
         <div>
           {activeOut.length ? (
-            activeOut.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={onAction} />)
+            activeOut.map(r => <TicketCard key={r.requestId || r.id || r._id} request={r} viewer="staff" onAction={handleCardAction} />)
           ) : (
             <div className="gkof-empty">No one is out right now.</div>
           )}
@@ -1925,11 +1979,48 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                   : 'ℹ️ These requests will be marked Warden Declined.'
               )}
             </div>
+
+            {bulkActionType === 'decline' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                  Reason for Decline <span style={{ color: '#DC2626' }}>*</span>
+                </label>
+                <textarea
+                  value={bulkDeclineReason}
+                  onChange={(e) => {
+                    setBulkDeclineReason(e.target.value);
+                    if (bulkDeclineError) setBulkDeclineError('');
+                  }}
+                  placeholder="Enter reason for declining these requests..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${bulkDeclineError ? '#DC2626' : '#D1D5DB'}`,
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {bulkDeclineError && (
+                  <div style={{ color: '#DC2626', fontSize: '12.5px', marginTop: '4px', fontWeight: 500 }}>
+                    ⚠️ {bulkDeclineError}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 className="gkof-btn"
-                onClick={() => setShowBulkConfirmModal(false)}
+                onClick={() => {
+                  setShowBulkConfirmModal(false);
+                  setBulkDeclineReason('');
+                  setBulkDeclineError('');
+                }}
                 disabled={bulkProcessing}
                 style={{
                   background: '#F3F4F6',
@@ -1957,6 +2048,133 @@ export default function StaffDashboard({ session, requests, onAction, onRefreshU
                 }}
               >
                 {bulkProcessing ? 'Processing...' : `Yes, ${bulkActionType === 'approve' ? 'Approve' : 'Decline'} (${validSelectedIds.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Decline Confirmation Modal */}
+      {singleDeclineTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !singleDeclineSubmitting) {
+              setSingleDeclineTarget(null);
+              setSingleDeclineReason('');
+              setSingleDeclineError('');
+            }
+          }}
+        >
+          <div
+            style={{
+              background: '#FFF',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '480px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px', color: '#1F2937', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚠️ Confirm Decline Request
+            </h3>
+            <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#4B5563', lineHeight: '1.5' }}>
+              Are you sure you want to decline the outpass request for{' '}
+              <b>{singleDeclineTarget.request?.name || 'Student'}</b> ({singleDeclineTarget.request?.reg || singleDeclineTarget.id})?
+            </p>
+            <div
+              style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '12.5px',
+                color: '#991B1B'
+              }}
+            >
+              ℹ️ {isFaculty
+                ? 'This request will be marked Faculty Declined and the student will be notified of the reason.'
+                : 'This request will be marked Warden Declined and the student will be notified of the reason.'}
+            </div>
+
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+                Reason for Decline <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <textarea
+                value={singleDeclineReason}
+                onChange={(e) => {
+                  setSingleDeclineReason(e.target.value);
+                  if (singleDeclineError) setSingleDeclineError('');
+                }}
+                placeholder="Please enter a reason for declining this request..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: `1px solid ${singleDeclineError ? '#DC2626' : '#D1D5DB'}`,
+                  fontSize: '13px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {singleDeclineError && (
+                <div style={{ color: '#DC2626', fontSize: '12.5px', marginTop: '4px', fontWeight: 500 }}>
+                  ⚠️ {singleDeclineError}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="gkof-btn"
+                onClick={() => {
+                  setSingleDeclineTarget(null);
+                  setSingleDeclineReason('');
+                  setSingleDeclineError('');
+                }}
+                disabled={singleDeclineSubmitting}
+                style={{
+                  background: '#F3F4F6',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                  fontWeight: 600,
+                  padding: '8px 16px',
+                  fontSize: '13px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="gkof-btn red"
+                onClick={handleConfirmSingleDecline}
+                disabled={singleDeclineSubmitting}
+                style={{
+                  fontWeight: 700,
+                  padding: '8px 18px',
+                  fontSize: '13px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {singleDeclineSubmitting ? 'Declining...' : 'Confirm Decline'}
               </button>
             </div>
           </div>

@@ -553,6 +553,17 @@ router.post('/bulk-action', protect, protectStaffOrFaculty, async (req, res) => 
       return res.status(403).json({ success: false, message: '403 Forbidden: Only Wardens can perform Warden bulk actions.' });
     }
 
+    // Mandatory reason validation for Faculty Advisor and Warden declines
+    if (action === 'faculty_rejected' || action === 'staff_rejected') {
+      const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+      if (!trimmedReason) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a reason for declining this request.'
+        });
+      }
+    }
+
     // Pre-fetch active wardens if faculty approving to avoid querying inside loop
     let activeWardens = [];
     if (action === 'faculty_approved') {
@@ -632,8 +643,8 @@ router.post('/bulk-action', protect, protectStaffOrFaculty, async (req, res) => 
             request.currentApprovalStage = 'REJECTED';
             request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
             request.facultyActionAt = new Date();
-            request.rejectionReason = reason || 'Declined by Faculty Advisor (Bulk)';
-            request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request (Bulk)`);
+            request.rejectionReason = reason.trim();
+            request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request (Bulk): ${reason.trim()}`);
           }
 
           await request.save();
@@ -696,8 +707,8 @@ router.post('/bulk-action', protect, protectStaffOrFaculty, async (req, res) => 
             request.currentApprovalStage = 'REJECTED';
             request.wardenActionBy = req.user.name || req.user.username;
             request.wardenActionAt = new Date();
-            request.rejectionReason = reason || 'Declined by Warden (Bulk)';
-            request.log.push(`Warden (${req.user.name}) declined the request (Bulk)`);
+            request.rejectionReason = reason.trim();
+            request.log.push(`Warden (${req.user.name}) declined the request (Bulk): ${reason.trim()}`);
           }
 
           await request.save();
@@ -793,6 +804,38 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
       }
     }
 
+    // Check if request is in appropriate stage for action
+    if (action === 'faculty_approved' || action === 'faculty_rejected') {
+      const isPendingFaculty = request.status === 'pending_faculty' || request.currentApprovalStage === 'FACULTY';
+      if (!isPendingFaculty) {
+        return res.status(400).json({
+          success: false,
+          message: 'Request is not awaiting Faculty Advisor approval.'
+        });
+      }
+    }
+
+    if (action === 'staff_approved' || action === 'staff_rejected') {
+      const isPendingWarden = request.status === 'pending_staff' || request.status === 'pending_warden' || request.status === 'faculty_approved' || request.currentApprovalStage === 'WARDEN';
+      if (!isPendingWarden) {
+        return res.status(400).json({
+          success: false,
+          message: 'Request is not awaiting Warden approval.'
+        });
+      }
+    }
+
+    // MANDATORY REASON VALIDATION FOR FACULTY ADVISOR & WARDEN DECLINES
+    if (action === 'faculty_rejected' || action === 'staff_rejected') {
+      const trimmedReason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+      if (!trimmedReason) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a reason for declining this request.'
+        });
+      }
+    }
+
     switch (action) {
       case 'faculty_approved':
         request.status = 'pending_staff';
@@ -818,8 +861,8 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
         request.currentApprovalStage = 'REJECTED';
         request.facultyActionBy = req.user.name || req.user.staffId || req.user.username;
         request.facultyActionAt = new Date();
-        request.rejectionReason = req.body.reason || 'Declined by Faculty Advisor';
-        request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request`);
+        request.rejectionReason = req.body.reason.trim();
+        request.log.push(`Faculty Advisor: ${req.user.name}${req.user.staffId ? ` (ID: ${req.user.staffId})` : ''} Declined the request: ${request.rejectionReason}`);
         break;
       case 'staff_approved':
         request.status = 'notifying_parent';
@@ -835,8 +878,8 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
         request.currentApprovalStage = 'REJECTED';
         request.wardenActionBy = req.user.name || req.user.username;
         request.wardenActionAt = new Date();
-        request.rejectionReason = req.body.reason || 'Declined by Warden';
-        request.log.push(`Warden (${req.user.name}) declined the request`);
+        request.rejectionReason = req.body.reason.trim();
+        request.log.push(`Warden (${req.user.name}) declined the request: ${request.rejectionReason}`);
         break;
       case 'parent_approved':
         request.status = 'approved_final';
@@ -852,7 +895,7 @@ router.patch('/:id/action', protect, protectStaffOrFaculty, async (req, res) => 
       case 'parent_rejected':
         request.status = 'parent_rejected';
         request.currentApprovalStage = 'REJECTED';
-        request.rejectionReason = req.body.reason || 'Declined by Parent';
+        request.rejectionReason = (typeof req.body.reason === 'string' && req.body.reason.trim()) ? req.body.reason.trim() : 'Declined by Parent';
         request.log.push('Parent declined the request');
         break;
       case 'returned':

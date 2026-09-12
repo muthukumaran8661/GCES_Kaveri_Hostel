@@ -263,9 +263,13 @@ export default function App() {
     }
   };
 
-  const handleAction = async (id, act) => {
+  const handleAction = async (id, act, reason) => {
     try {
-      await apiFetch(`/api/requests/${id}/action`, 'PATCH', { action: act });
+      const payload = { action: act };
+      if (reason !== undefined && reason !== null) {
+        payload.reason = reason;
+      }
+      await apiFetch(`/api/requests/${id}/action`, 'PATCH', payload);
       await refreshData();
     } catch (err) {
       alert(err.message || 'Action failed');
